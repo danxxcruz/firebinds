@@ -1,0 +1,277 @@
+:root {
+  color-scheme: light;
+  font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f8fafc;
+  color: #111827;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  min-height: 280px;
+  margin: 0;
+  background: #f8fafc;
+  color: #111827;
+}
+
+button,
+select,
+input[type="text"],
+input[type="search"] {
+  font: inherit;
+}
+
+.app {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+h2 {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.muted,
+.target {
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.toolbar,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar {
+  justify-content: space-between;
+}
+
+button,
+select,
+input[type="text"],
+input[type="search"] {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  color: #111827;
+  padding: 7px 9px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #94a3b8;
+}
+
+.primary {
+  border-color: #1f2937;
+  background: #1f2937;
+  color: white;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.panel,
+.notice,
+.binding {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+}
+
+.panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.profile-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.profile-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.profile-actions button {
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+.count {
+  min-width: 26px;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.compact {
+  min-width: 0;
+}
+
+.notice {
+  padding: 8px 10px;
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+.notice.error {
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.target-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span,
+.check,
+.switch {
+  font-size: 12px;
+  color: #475569;
+}
+
+.capture {
+  width: 100%;
+  text-align: left;
+  font-weight: 700;
+}
+
+.capture.listening {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.check,
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conflict {
+  padding: 8px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.bindings {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.list-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-header input {
+  min-width: 0;
+  padding: 5px 7px;
+}
+
+.binding {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+}
+
+.binding-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.binding-label {
+  min-width: 0;
+}
+
+.binding-label strong,
+.binding-label span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo {
+  align-self: start;
+  border-radius: 5px;
+  background: #111827;
+  color: #fff7ed;
+  padding: 2px 6px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.binding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.binding-actions button {
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.empty {
+  padding: 14px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  text-align: center;
+}
