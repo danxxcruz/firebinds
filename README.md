@@ -46,8 +46,7 @@ are happier for it.
 
 ## Demo
 
-*(Recording a walkthrough video — will drop it here once it's done. Until
-then, see "How It Works" below.)*
+<iframe width="560" height="315" src="https://www.youtube.com/embed/rZTAhEpd8QQ?si=iLEc62Kq3bLCMuDA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## What it does
 
