@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://addons.mozilla.org/es-MX/firefox/addon/firebinds/">
+  <a href="https://addons.mozilla.org/en-US/firefox/addon/firebinds/">
     <img alt="Install on Firefox" src="https://img.shields.io/badge/Install-Firefox%20Add--on-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white">
   </a>
 </p>
@@ -21,7 +21,7 @@
   <a href="https://github.com/danxxcruz/firebinds/releases">
     <img alt="GitHub release" src="https://img.shields.io/github/v/release/danxxcruz/firebinds?label=release">
   </a>
-  <a href="https://addons.mozilla.org/es-MX/firefox/addon/firebinds/">
+  <a href="https://addons.mozilla.org/en-US/firefox/addon/firebinds/">
     <img alt="Firefox Add-on version" src="https://img.shields.io/amo/v/firebinds?label=firefox">
   </a>
 </p>
