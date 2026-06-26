@@ -28,66 +28,52 @@ jobs:
       - name: Validate source and manifests
         run: npm run validate
 
-      - name: Package Firefox extension
-        run: npm run package:firefox
-
-      - name: Package Chrome extension
-        run: npm run package:chrome
-
-      - name: Prepare release metadata
-        id: meta
+      - name: Check for version bump
+        id: version
         shell: bash
         run: |
           version="$(node -p "require('./manifest.json').version")"
-          short_sha="${GITHUB_SHA::7}"
-          tag="v${version}-${GITHUB_RUN_NUMBER}-${short_sha}"
-
-          {
-            echo "version=${version}"
-            echo "short_sha=${short_sha}"
-            echo "tag=${tag}"
-            echo "firefox_zip=dist/firebinds-firefox-${version}.zip"
-            echo "chrome_zip=dist/firebinds-chrome-${version}.zip"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create release tag
-        shell: bash
-        run: |
-          tag="${{ steps.meta.outputs.tag }}"
-          git fetch --tags origin
+          tag="v${version}"
 
           if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            tagged_commit="$(git rev-list -n 1 "${tag}")"
-            if [ "${tagged_commit}" != "${GITHUB_SHA}" ]; then
-              echo "Tag ${tag} already exists for ${tagged_commit}, not ${GITHUB_SHA}."
-              exit 1
-            fi
+            echo "Tag ${tag} already exists. Nothing to release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
           else
-            git tag "${tag}" "${GITHUB_SHA}"
-            git push origin "refs/tags/${tag}"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Package Firefox extension
+        if: steps.version.outputs.should_release == 'true'
+        run: npm run package:firefox
+
+      - name: Package Chrome extension
+        if: steps.version.outputs.should_release == 'true'
+        run: npm run package:chrome
+
+      - name: Create release tag
+        if: steps.version.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          git tag "${tag}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${tag}"
+
       - name: Publish GitHub release
+        if: steps.version.outputs.should_release == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${{ steps.meta.outputs.tag }}"
-          title="Firebinds ${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.short_sha }})"
-          notes="Automated Firefox and Chrome extension packages built from commit ${{ github.sha }}."
+          tag="${{ steps.version.outputs.tag }}"
+          version="${{ steps.version.outputs.version }}"
 
-          if gh release view "${tag}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "${tag}" \
-              "${{ steps.meta.outputs.firefox_zip }}" \
-              "${{ steps.meta.outputs.chrome_zip }}" \
-              --repo "${{ github.repository }}" \
-              --clobber
-          else
-            gh release create "${tag}" \
-              "${{ steps.meta.outputs.firefox_zip }}" \
-              "${{ steps.meta.outputs.chrome_zip }}" \
-              --repo "${{ github.repository }}" \
-              --verify-tag \
-              --title "${title}" \
-              --notes "${notes}"
-          fi
+          gh release create "${tag}" \
+            "dist/firebinds-firefox-${version}.zip" \
+            "dist/firebinds-chrome-${version}.zip" \
+            --repo "${{ github.repository }}" \
+            --verify-tag \
+            --title "Firebinds ${version}" \
+            --notes "Automated Firefox and Chrome extension packages built from commit ${{ github.sha }}."
