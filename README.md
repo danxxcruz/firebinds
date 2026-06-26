@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icons/icon48.png" alt="Firebinds icon" width="72" height="72">
+  <img src="icons/icon.svg" alt="Firebinds icon" width="72" height="72">
 </p>
 
 <h1 align="center">Firebinds</h1>
@@ -36,7 +36,7 @@ element picking, key listening, small shortcut indicators, and passive feedback.
 ## Highlights
 
 - Pick elements visually, with click or `Q` confirmation.
-- Match targets by exact text or wildcard patterns like `Add New*`.
+- Match targets by exact text or wildcard patterns.
 - Use page, site, or global scopes.
 - Create profiles for different workflows.
 - Show small on-page key indicators for bound elements.
