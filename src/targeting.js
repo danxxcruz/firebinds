@@ -32,6 +32,29 @@
     return label.slice(0, 80);
   }
 
+  const stableAttributeNames = [
+    "data-testid",
+    "data-test",
+    "data-cy",
+    "aria-label",
+    "placeholder",
+    "name",
+    "title",
+    "role",
+    "type",
+    "jsname",
+    "data-idom-class"
+  ];
+
+  function storedAttributes(element) {
+    const attrs = {};
+    for (const attr of stableAttributeNames) {
+      const value = element.getAttribute(attr);
+      if (value) attrs[attr] = value;
+    }
+    return attrs;
+  }
+
   function isVisible(element) {
     if (!element || !(element instanceof Element)) return false;
     const rect = element.getBoundingClientRect();
@@ -107,25 +130,156 @@
       if (uniqueSelector(documentRef, selector)) return selector;
     }
 
-    const attrs = [
-      "data-testid",
-      "data-test",
-      "data-cy",
-      "aria-label",
-      "placeholder",
-      "name",
-      "title",
-      "role",
-      "type"
-    ];
-    for (const attr of attrs) {
-      const value = element.getAttribute(attr);
+    const attrs = storedAttributes(element);
+    for (const attr of stableAttributeNames) {
+      const value = attrs[attr];
       if (!value) continue;
       const selector = `${tag}[${attr}="${attrEscape(value)}"]`;
       if (uniqueSelector(documentRef, selector)) return selector;
     }
 
+    for (const primary of ["aria-label", "placeholder", "title", "name"]) {
+      if (!attrs[primary]) continue;
+      for (const secondary of stableAttributeNames) {
+        if (primary === secondary || !attrs[secondary]) continue;
+        const selector = `${tag}[${primary}="${attrEscape(attrs[primary])}"][${secondary}="${attrEscape(attrs[secondary])}"]`;
+        if (uniqueSelector(documentRef, selector)) return selector;
+      }
+    }
+
     return nthPath(element);
+  }
+
+  function selectorIndex(documentRef, selector, element, target) {
+    if (!selector) return -1;
+    try {
+      const matches = uniqueElements(
+        deepQuery(documentRef, selector)
+          .map((match) => descriptorElement(match))
+          .filter(isVisible)
+          .filter((match) => !target || matchesTargetContext(match, target))
+      );
+      return matches.indexOf(element);
+    } catch (_error) {
+      return -1;
+    }
+  }
+
+  function labelCandidates(documentRef, tagName, label, contextTarget) {
+    if (!label) return [];
+    return uniqueElements(
+      deepQuery(documentRef, tagName || "*")
+        .map((element) => descriptorElement(element))
+        .filter(isVisible)
+        .filter((element) => !contextTarget || matchesTargetContext(element, contextTarget))
+        .filter((element) => !tagName || element.tagName.toLowerCase() === tagName)
+        .filter((element) => labelFor(element) === label)
+    );
+  }
+
+  function labelIndex(documentRef, element, contextTarget) {
+    const matches = labelCandidates(
+      documentRef,
+      element.tagName.toLowerCase(),
+      labelFor(element),
+      contextTarget
+    );
+    return matches.indexOf(element);
+  }
+
+  function rectHintFor(element) {
+    const rect = element.getBoundingClientRect();
+    const viewportWidth = Math.max(1, element.ownerDocument.documentElement.clientWidth);
+    const viewportHeight = Math.max(1, element.ownerDocument.documentElement.clientHeight);
+    return {
+      x: Math.round(((rect.left + rect.width / 2) / viewportWidth) * 1000) / 1000,
+      y: Math.round(((rect.top + rect.height / 2) / viewportHeight) * 1000) / 1000
+    };
+  }
+
+  function distanceFromRectHint(element, rectHint) {
+    if (!rectHint) return Number.POSITIVE_INFINITY;
+    const rect = element.getBoundingClientRect();
+    const viewportWidth = Math.max(1, element.ownerDocument.documentElement.clientWidth);
+    const viewportHeight = Math.max(1, element.ownerDocument.documentElement.clientHeight);
+    const x = (rect.left + rect.width / 2) / viewportWidth;
+    const y = (rect.top + rect.height / 2) / viewportHeight;
+    return Math.hypot(x - rectHint.x, y - rectHint.y);
+  }
+
+  function attributeScore(element, target) {
+    if (!target.attributes) return 0;
+    let score = 0;
+    for (const [attr, value] of Object.entries(target.attributes)) {
+      if (value && element.getAttribute(attr) === value) score += 1;
+    }
+    return score;
+  }
+
+  function indexedMatch(documentRef, matches, target) {
+    if (!matches.length) return null;
+
+    if (Number.isInteger(target.selectorIndex) && target.selectorIndex >= 0 && target.selector) {
+      const selectorMatches = uniqueElements(
+        deepQuery(documentRef, target.selector)
+          .map((element) => descriptorElement(element))
+          .filter(isVisible)
+          .filter((element) => matchesTargetContext(element, target))
+      );
+      const indexed = selectorMatches[target.selectorIndex];
+      if (indexed && matches.includes(indexed) && confidenceMatch(indexed, target) > 0) return indexed;
+    }
+
+    if (Number.isInteger(target.labelIndex) && target.labelIndex >= 0 && target.label) {
+      const candidates = labelCandidates(documentRef, target.tagName, target.label, target);
+      const indexed = candidates[target.labelIndex];
+      if (indexed && matches.includes(indexed) && confidenceMatch(indexed, target) > 0) return indexed;
+    }
+
+    if (target.rectHint && matches.length > 1) {
+      const nearest = matches
+        .map((element) => ({ element, distance: distanceFromRectHint(element, target.rectHint) }))
+        .sort((a, b) => a.distance - b.distance);
+      if (nearest[0] && nearest[0].distance < 0.12 && nearest[0].distance + 0.08 < nearest[1].distance) {
+        return nearest[0].element;
+      }
+    }
+
+    return null;
+  }
+
+  function bestScoredMatch(documentRef, candidates, target) {
+    const scored = candidates
+      .map((element) => ({ element, score: scoreMatch(element, target) }))
+      .sort((a, b) => b.score - a.score);
+    if (!scored.length || scored[0].score <= 0) return null;
+    const topScore = scored[0].score;
+    const topMatches = scored.filter((item) => item.score === topScore).map((item) => item.element);
+    if (topMatches.length === 1) return topMatches[0];
+    return indexedMatch(documentRef, topMatches, target);
+  }
+
+  function createDescriptor(element, url) {
+    const picked = descriptorElement(element);
+    const selector = stableSelector(picked);
+    const contextTarget = {
+      contextHint: contextHintFor(picked),
+      selector
+    };
+    return {
+      mode: "picker",
+      label: labelFor(picked),
+      selector,
+      selectorIndex: selectorIndex(picked.ownerDocument, selector, picked, contextTarget),
+      labelIndex: labelIndex(picked.ownerDocument, picked, contextTarget),
+      tagName: picked.tagName.toLowerCase(),
+      attributes: storedAttributes(picked),
+      textHint: visibleText(picked).slice(0, 80),
+      roleHint: picked.getAttribute("role") || "",
+      contextHint: contextHintFor(picked),
+      rectHint: rectHintFor(picked),
+      urlAtSelection: url
+    };
   }
 
   function nthPath(element) {
@@ -144,19 +298,6 @@
     return parts.length ? `body > ${parts.join(" > ")}` : "body";
   }
 
-  function createDescriptor(element, url) {
-    const picked = descriptorElement(element);
-    return {
-      mode: "picker",
-      label: labelFor(picked),
-      selector: stableSelector(picked),
-      tagName: picked.tagName.toLowerCase(),
-      textHint: visibleText(picked).slice(0, 80),
-      roleHint: picked.getAttribute("role") || "",
-      contextHint: contextHintFor(picked),
-      urlAtSelection: url
-    };
-  }
 
   function createTextDescriptor(mode, textQuery) {
     const normalizedQuery = String(textQuery || "").replace(/\s+/g, " ").trim();
@@ -172,6 +313,7 @@
     if (element.tagName.toLowerCase() === target.tagName) score += 2;
     if (target.roleHint && element.getAttribute("role") === target.roleHint) score += 2;
     if (target.textHint && visibleText(element).startsWith(target.textHint)) score += 2;
+    score += Math.min(attributeScore(element, target), 3);
     if (labelFor(element) === target.label) score += 1;
     return score;
   }
@@ -180,6 +322,7 @@
     let score = 0;
     if (target.roleHint && element.getAttribute("role") === target.roleHint) score += 1;
     if (target.textHint && visibleText(element).startsWith(target.textHint)) score += 1;
+    if (attributeScore(element, target) > 0) score += 1;
     if (target.label && labelFor(element) === target.label) score += 1;
     return score;
   }
@@ -258,12 +401,8 @@
       }
     }
     if (matches.length > 1) {
-      const scored = matches
-        .map((element) => ({ element, score: scoreMatch(element, target) }))
-        .sort((a, b) => b.score - a.score);
-      if (scored[0] && scored[0].score > 0 && scored[0].score > (scored[1] ? scored[1].score : -1)) {
-        return { status: "ready", element: scored[0].element };
-      }
+      const best = bestScoredMatch(documentRef, matches, target);
+      if (best) return { status: "ready", element: best };
       return { status: "ambiguous", element: null };
     }
 
@@ -274,14 +413,11 @@
           .filter(isVisible)
           .filter((element) => matchesTargetContext(element, target))
       );
-      const scored = candidates
-        .map((element) => ({ element, score: scoreMatch(element, target) }))
-        .filter((item) => item.score > (target.textHint || target.roleHint ? 1 : 0))
-        .sort((a, b) => b.score - a.score);
-      if (scored.length === 1 || (scored[0] && scored[0].score > scored[1].score)) {
-        return { status: "ready", element: scored[0].element };
-      }
-      if (scored.length > 1) return { status: "ambiguous", element: null };
+      const threshold = target.textHint || target.roleHint || target.attributes ? 1 : 0;
+      const scoredCandidates = candidates.filter((element) => scoreMatch(element, target) > threshold);
+      const best = bestScoredMatch(documentRef, scoredCandidates, target);
+      if (best) return { status: "ready", element: best };
+      if (scoredCandidates.length > 1) return { status: "ambiguous", element: null };
     }
 
     return { status: "missing", element: null };
