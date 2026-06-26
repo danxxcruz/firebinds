@@ -36,3 +36,27 @@ profile's bindings apply to the current page.
 - Filter the binding list by key, target, scope, or status.
 - Duplicate a binding, then assign the copy a new key.
 - Test a target from the popup before saving or while editing.
+
+## Backup
+
+Use **Export** in the popup to save profiles, keybinds, and settings as a JSON
+backup. Use **Import** to restore a backup on another browser profile or device.
+Importing replaces the current Firebinds data after confirmation.
+
+## Builds
+
+The source extension remains Firefox-first, but the build scripts prepare clean
+browser-specific outputs for release automation.
+
+```powershell
+npm run build:firefox
+npm run build:chrome
+npm run package:firefox
+npm run package:chrome
+npm run validate
+```
+
+Build output is written to `dist/` and is ignored by Git. The Firefox build keeps
+Firefox-specific manifest metadata and background scripts. The Chrome build uses
+a generated MV3 service worker manifest and omits Firefox-only metadata. Chrome
+runtime support should still be tested manually before publishing.

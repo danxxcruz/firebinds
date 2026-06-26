@@ -15,6 +15,11 @@
     renameProfileButton: document.getElementById("renameProfileButton"),
     duplicateProfileButton: document.getElementById("duplicateProfileButton"),
     deleteProfileButton: document.getElementById("deleteProfileButton"),
+    optionsMenu: document.querySelector(".options-menu"),
+    backupMenu: document.querySelector(".backup-menu"),
+    exportButton: document.getElementById("exportButton"),
+    importButton: document.getElementById("importButton"),
+    importFileInput: document.getElementById("importFileInput"),
     addButton: document.getElementById("addButton"),
     indicatorsToggle: document.getElementById("indicatorsToggle"),
     debugKeysToggle: document.getElementById("debugKeysToggle"),
@@ -42,8 +47,44 @@
   let pageState = null;
   let form = null;
 
+  const BUTTON_ICONS = {
+    Edit: "edit",
+    Duplicate: "copy",
+    Test: "target",
+    Disable: "power",
+    Enable: "power",
+    Delete: "trash"
+  };
+
   function send(message) {
     return browser.runtime.sendMessage(message);
+  }
+
+  function iconNode(name) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    svg.setAttribute("class", "button-icon");
+    svg.setAttribute("aria-hidden", "true");
+    use.setAttribute("href", `#icon-${name}`);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function setButtonContent(node, label, iconName) {
+    node.textContent = "";
+    if (iconName) node.appendChild(iconNode(iconName));
+    const text = document.createElement("span");
+    text.textContent = label;
+    node.appendChild(text);
+  }
+
+  function setButtonLabel(node, label) {
+    const text = node.querySelector("span");
+    if (text) {
+      text.textContent = label;
+      return;
+    }
+    node.textContent = label;
   }
 
   function showNotice(text, kind) {
@@ -87,6 +128,23 @@
     return binding.scopeType;
   }
 
+  function backupFileName() {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    return `firebinds-backup-${stamp}.json`;
+  }
+
+  function downloadJson(fileName, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function targetModeFor(target) {
     return target && target.mode ? target.mode : "picker";
   }
@@ -97,7 +155,7 @@
     const isPicker = mode === "picker";
     els.pickerTargetPanel.hidden = !isPicker;
     els.textTargetPanel.hidden = isPicker;
-    els.pickTargetButton.textContent = form.id ? "Reselect element" : "Pick element";
+    setButtonLabel(els.pickTargetButton, form.id ? "Reselect element" : "Pick element");
     els.targetLabel.textContent = bindingTargetLabel(form.target);
     els.testTargetButton.disabled = !targetFromForm(false);
   }
@@ -202,7 +260,7 @@
   function button(label, onClick) {
     const node = document.createElement("button");
     node.type = "button";
-    node.textContent = label;
+    setButtonContent(node, label, BUTTON_ICONS[label]);
     node.addEventListener("click", onClick);
     return node;
   }
@@ -439,6 +497,37 @@
     await loadState();
   }
 
+  async function exportBackup() {
+    const result = await send({ type: M.EXPORT_BACKUP });
+    if (!result.ok) {
+      showNotice(result.reason || "Could not export backup.", "error");
+      return;
+    }
+    downloadJson(backupFileName(), result.backup);
+    if (els.backupMenu) els.backupMenu.open = false;
+    showNotice("Backup exported.", "");
+  }
+
+  async function importBackupFile(file) {
+    if (!file) return;
+    try {
+      const backup = JSON.parse(await file.text());
+      if (!confirm("Importing this backup will replace all current Firebinds profiles and keybinds.")) return;
+      const result = await send({ type: M.IMPORT_BACKUP, backup });
+      if (!result.ok) {
+        showNotice(result.reason || "Could not import backup.", "error");
+        return;
+      }
+      setForm(null);
+      await loadState();
+      showNotice("Backup imported.", "");
+    } catch (error) {
+      showNotice(error.message || "Backup file is not valid JSON.", "error");
+    } finally {
+      els.importFileInput.value = "";
+    }
+  }
+
   els.refreshButton.addEventListener("click", loadState);
   els.profileSelect.addEventListener("change", async () => {
     await send({ type: M.SET_ACTIVE_PROFILE, id: els.profileSelect.value });
@@ -449,6 +538,18 @@
   els.renameProfileButton.addEventListener("click", renameProfile);
   els.duplicateProfileButton.addEventListener("click", duplicateProfile);
   els.deleteProfileButton.addEventListener("click", deleteProfile);
+  els.optionsMenu.addEventListener("toggle", () => {
+    if (els.optionsMenu.open && els.backupMenu) els.backupMenu.open = false;
+  });
+  els.backupMenu.addEventListener("toggle", () => {
+    if (els.backupMenu.open && els.optionsMenu) els.optionsMenu.open = false;
+  });
+  els.exportButton.addEventListener("click", exportBackup);
+  els.importButton.addEventListener("click", () => {
+    if (els.backupMenu) els.backupMenu.open = false;
+    els.importFileInput.click();
+  });
+  els.importFileInput.addEventListener("change", () => importBackupFile(els.importFileInput.files[0]));
   els.addButton.addEventListener("click", newForm);
   els.pickTargetButton.addEventListener("click", () => startPicker(form && form.id));
   els.targetModeSelect.addEventListener("change", () => {

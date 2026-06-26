@@ -24,6 +24,7 @@
   },
   "background": {
     "scripts": [
+      "src/api.js",
       "src/messages.js",
       "src/key-combo.js",
       "src/targeting.js",
@@ -35,6 +36,7 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "src/api.js",
         "src/messages.js",
         "src/key-combo.js",
         "src/targeting.js",
