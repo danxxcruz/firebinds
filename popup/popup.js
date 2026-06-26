@@ -261,6 +261,13 @@
     const node = document.createElement("button");
     node.type = "button";
     setButtonContent(node, label, BUTTON_ICONS[label]);
+    if (label === "Delete") {
+      node.classList.add("danger", "icon-only");
+      node.title = "Delete binding";
+      node.setAttribute("aria-label", "Delete binding");
+      const text = node.querySelector("span");
+      if (text) text.remove();
+    }
     node.addEventListener("click", onClick);
     return node;
   }
