@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Firebinds",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Create simple popup-managed keybinds for webpage elements.",
   "browser_specific_settings": {
     "gecko": {
