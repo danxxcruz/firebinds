@@ -18,6 +18,10 @@
   --warning-text: #7a4b00;
   --error-bg: #fff1f0;
   --error-text: #b42318;
+  --danger: #ff3b30;
+  --danger-bg: rgba(255, 59, 48, 0.08);
+  --danger-border: rgba(255, 59, 48, 0.34);
+  --danger-focus: rgba(255, 59, 48, 0.2);
   --focus: rgba(0, 122, 255, 0.22);
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   font: 13px/1.38 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
@@ -45,6 +49,10 @@
     --warning-text: #ffd98a;
     --error-bg: #3f1514;
     --error-text: #ffb4ab;
+    --danger: #ff453a;
+    --danger-bg: rgba(255, 69, 58, 0.12);
+    --danger-border: rgba(255, 69, 58, 0.38);
+    --danger-focus: rgba(255, 69, 58, 0.25);
     --focus: rgba(10, 132, 255, 0.28);
     --shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
   }
@@ -207,6 +215,26 @@ h2 {
   background: var(--accent-hover);
 }
 
+.danger {
+  color: var(--danger);
+}
+
+.danger:hover {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.danger:focus-visible {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-focus);
+}
+
+.icon-only {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
 .icon-button {
   width: 32px;
   height: 32px;
@@ -248,7 +276,7 @@ h2 {
 }
 
 .profile-actions {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
 }
 
 .profile-actions button,
@@ -263,6 +291,13 @@ h2 {
 .binding-actions .button-icon {
   width: 12px;
   height: 12px;
+}
+
+.profile-actions .icon-only,
+.binding-actions .icon-only {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
 }
 
 .popup-menu {
