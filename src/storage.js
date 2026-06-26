@@ -6,6 +6,7 @@
   const ACTIVE_PROFILE_KEY = "firebinds.activeProfileId";
   const DEFAULT_PROFILE_ID = "profile-default";
   const GLOBAL_SCOPE_VALUE = "*";
+  const BACKUP_SCHEMA_VERSION = 1;
 
   let initPromise = null;
 
@@ -32,6 +33,18 @@
 
   async function rawGet(keys) {
     return browser.storage.local.get(keys);
+  }
+
+  function assertArray(value, name) {
+    if (!Array.isArray(value)) throw new Error(`Backup ${name} must be an array.`);
+    return value;
+  }
+
+  function plainObject(value, name) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`Backup ${name} must be an object.`);
+    }
+    return value;
   }
 
   async function ensureInitialized() {
@@ -332,6 +345,53 @@
     );
   }
 
+  async function exportBackup() {
+    await ensureInitialized();
+    const result = await rawGet([BINDINGS_KEY, SETTINGS_KEY, PROFILES_KEY, ACTIVE_PROFILE_KEY]);
+    const manifest = browser.runtime.getManifest();
+    return {
+      schemaVersion: BACKUP_SCHEMA_VERSION,
+      app: "Firebinds",
+      extensionVersion: manifest.version,
+      exportedAt: now(),
+      profiles: Array.isArray(result[PROFILES_KEY]) ? result[PROFILES_KEY] : [],
+      activeProfileId: result[ACTIVE_PROFILE_KEY] || DEFAULT_PROFILE_ID,
+      bindings: Array.isArray(result[BINDINGS_KEY]) ? result[BINDINGS_KEY] : [],
+      settings: result[SETTINGS_KEY] || { indicatorVisibility: {} }
+    };
+  }
+
+  async function importBackup(backup) {
+    const data = plainObject(backup, "root");
+    if (data.app !== "Firebinds") throw new Error("Backup is not a Firebinds backup.");
+    if (data.schemaVersion !== BACKUP_SCHEMA_VERSION) throw new Error("Backup version is not supported.");
+
+    const profiles = assertArray(data.profiles, "profiles");
+    const bindings = assertArray(data.bindings, "bindings");
+    const settings = data.settings === undefined ? { indicatorVisibility: {} } : plainObject(data.settings, "settings");
+    const activeProfileId = typeof data.activeProfileId === "string" ? data.activeProfileId : "";
+
+    for (const profile of profiles) {
+      plainObject(profile, "profile");
+      if (typeof profile.id !== "string" || !profile.id) throw new Error("Backup profile is missing an id.");
+      if (typeof profile.name !== "string") throw new Error("Backup profile is missing a name.");
+    }
+    for (const binding of bindings) {
+      plainObject(binding, "binding");
+      if (typeof binding.id !== "string" || !binding.id) throw new Error("Backup binding is missing an id.");
+    }
+
+    await browser.storage.local.set({
+      [BINDINGS_KEY]: bindings,
+      [SETTINGS_KEY]: settings,
+      [PROFILES_KEY]: profiles,
+      [ACTIVE_PROFILE_KEY]: activeProfileId
+    });
+    initPromise = null;
+    await ensureInitialized();
+    return exportBackup();
+  }
+
   Firebinds.Storage = Object.freeze({
     GLOBAL_SCOPE_VALUE,
     getAllBindings,
@@ -351,6 +411,8 @@
     saveProfile,
     deleteProfile,
     duplicateProfile,
-    setActiveProfile
+    setActiveProfile,
+    exportBackup,
+    importBackup
   });
 })(globalThis);

@@ -35,6 +35,11 @@
     setTimeout(() => node.remove(), 2200);
   }
 
+  function debugLog(label, detail) {
+    if (!pageState.debugKeys) return;
+    console.info(`[Firebinds] ${label}`, detail);
+  }
+
   function clearIndicators() {
     for (const node of indicators.values()) node.remove();
     indicators = new Map();
@@ -46,6 +51,59 @@
     const left = Math.max(0, rect.left + global.scrollX);
     node.style.top = `${top}px`;
     node.style.left = `${left}px`;
+  }
+
+  function rectsOverlap(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function clippedRect(rect) {
+    const maxX = document.documentElement.clientWidth;
+    const maxY = document.documentElement.clientHeight;
+    return {
+      left: Math.max(0, Math.min(maxX, rect.left)),
+      right: Math.max(0, Math.min(maxX, rect.right)),
+      top: Math.max(0, Math.min(maxY, rect.top)),
+      bottom: Math.max(0, Math.min(maxY, rect.bottom))
+    };
+  }
+
+  function visibleOverlayPanels() {
+    const viewportArea = Math.max(1, document.documentElement.clientWidth * document.documentElement.clientHeight);
+    const semantic = Array.from(document.querySelectorAll('dialog[open], [aria-modal="true"], [role="dialog"]'));
+    const layered = Array.from(document.body ? document.body.querySelectorAll("*") : [])
+      .filter((element) => {
+        if (isFirebindsNode(element)) return false;
+        const style = global.getComputedStyle ? global.getComputedStyle(element) : null;
+        const zIndex = style ? Number.parseInt(style.zIndex, 10) : 0;
+        const position = style ? style.position : "";
+        return Number.isFinite(zIndex) && zIndex >= 100 && ["absolute", "fixed", "sticky"].includes(position);
+      });
+
+    return [...new Set([...semantic, ...layered])]
+      .filter((element) => {
+        if (isFirebindsNode(element) || !Targeting.isVisible(element)) return false;
+        const rect = element.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        const isSemantic = semantic.includes(element);
+        const isFullscreenBackdrop =
+          area >= viewportArea * 0.9 &&
+          rect.left <= 1 &&
+          rect.top <= 1 &&
+          rect.right >= document.documentElement.clientWidth - 1 &&
+          rect.bottom >= document.documentElement.clientHeight - 1;
+        if (isFullscreenBackdrop && element.tagName.toLowerCase() !== "dialog") return false;
+        return rect.width >= 80 && rect.height >= 40 && (isSemantic || area < viewportArea * 0.9);
+      });
+  }
+
+  function isIndicatorOccluded(node, target) {
+    const indicatorRect = clippedRect(node.getBoundingClientRect());
+    if (indicatorRect.right <= indicatorRect.left || indicatorRect.bottom <= indicatorRect.top) return true;
+    return visibleOverlayPanels().some((panel) => {
+      if (panel === target || panel.contains(target)) return false;
+      return rectsOverlap(indicatorRect, clippedRect(panel.getBoundingClientRect()));
+    });
   }
 
   function renderIndicators() {
@@ -66,6 +124,10 @@
       node.title = `Firebinds: ${binding.keyCombo}`;
       document.documentElement.appendChild(node);
       positionIndicator(node, match.element);
+      if (isIndicatorOccluded(node, match.element)) {
+        node.remove();
+        continue;
+      }
       indicators.set(binding.id, node);
     }
   }
@@ -85,9 +147,40 @@
     picker.box.style.height = `${rect.height}px`;
   }
 
+  function pickerElementFromEvent(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    const element = path.find((node) => node instanceof Element && !isFirebindsNode(node));
+    return element || event.target;
+  }
+
+  function selectPickerTarget(event) {
+    if (!picker || !picker.target || isFirebindsNode(picker.target)) return;
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+    const target = Targeting.createDescriptor(picker.target, location.href);
+    debugLog("Picked target", target);
+    stopPicker(false);
+    send({ type: M.PICKER_RESULT, target }).catch(() => {});
+    toast("Element selected. Finish the keybind in the popup.");
+  }
+
+  function blockPickerPointerEvent(event) {
+    if (!picker || isFirebindsNode(event.target)) return;
+    updatePickerBox(pickerElementFromEvent(event));
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+  }
+
   function stopPicker(cancelled) {
     if (!picker) return;
     document.removeEventListener("mousemove", picker.onMove, true);
+    document.removeEventListener("pointerdown", picker.onPointerDown, true);
+    document.removeEventListener("mousedown", picker.onPointerBlock, true);
+    document.removeEventListener("mouseup", picker.onPointerBlock, true);
     document.removeEventListener("click", picker.onClick, true);
     document.removeEventListener("keydown", picker.onKeyDown, true);
     picker.box.remove();
@@ -109,17 +202,19 @@
       box,
       target: null,
       onMove(event) {
-        updatePickerBox(event.target);
+        updatePickerBox(pickerElementFromEvent(event));
+      },
+      onPointerDown(event) {
+        if (event.button && event.button !== 0) return;
+        blockPickerPointerEvent(event);
+        selectPickerTarget(event);
+      },
+      onPointerBlock(event) {
+        blockPickerPointerEvent(event);
       },
       onClick(event) {
         if (!picker || !picker.target || isFirebindsNode(event.target)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        const target = Targeting.createDescriptor(picker.target, location.href);
-        stopPicker(false);
-        send({ type: M.PICKER_RESULT, target }).catch(() => {});
-        toast("Element selected. Finish the keybind in the popup.");
+        selectPickerTarget(event);
       },
       onKeyDown(event) {
         if (event.key === "Escape") {
@@ -127,14 +222,21 @@
           event.stopPropagation();
           stopPicker(true);
           renderIndicators();
+          return;
+        }
+        if (event.key.toLowerCase() === "q") {
+          selectPickerTarget(event);
         }
       }
     };
 
     document.addEventListener("mousemove", picker.onMove, true);
+    document.addEventListener("pointerdown", picker.onPointerDown, true);
+    document.addEventListener("mousedown", picker.onPointerBlock, true);
+    document.addEventListener("mouseup", picker.onPointerBlock, true);
     document.addEventListener("click", picker.onClick, true);
     document.addEventListener("keydown", picker.onKeyDown, true);
-    toast("Pick an element. Press Escape to cancel.");
+    toast("Hover an element, then click or press Q. Escape cancels.");
   }
 
   function activateElement(element) {
@@ -201,6 +303,11 @@
     if (match.status !== "ready") {
       event.preventDefault();
       event.stopPropagation();
+      debugLog("Target match failed", {
+        keyCombo: binding.keyCombo,
+        status: match.status,
+        target: binding.target
+      });
       send({ type: M.BINDING_STATUS, id: binding.id, status: match.status }).catch(() => {});
       toast(match.status === "ambiguous" ? "This keybind needs re-selection." : "Target not found.");
       return;
@@ -213,6 +320,7 @@
     event.stopPropagation();
     event.stopImmediatePropagation();
     activateElement(match.element);
+    refreshIndicatorsSoon();
     if (binding.status !== "ready") {
       send({ type: M.BINDING_STATUS, id: binding.id, status: "ready" }).catch(() => {});
     }
@@ -251,10 +359,24 @@
     }
     if (message.type === M.CHECK_TARGET) {
       const match = Targeting.matchTarget(document, message.target);
+      const label = match.element
+        ? (
+            match.element.getAttribute("aria-label") ||
+            match.element.getAttribute("placeholder") ||
+            match.element.getAttribute("name") ||
+            match.element.textContent ||
+            match.element.tagName
+          ).trim().slice(0, 80)
+        : "";
+      debugLog("Test target", {
+        status: match.status,
+        target: message.target,
+        matchedTag: match.element ? match.element.tagName.toLowerCase() : ""
+      });
       return Promise.resolve({
         ok: true,
         status: match.status,
-        label: match.element ? (match.element.getAttribute("aria-label") || match.element.textContent || match.element.tagName).trim().slice(0, 80) : ""
+        label
       });
     }
     return false;

@@ -23,6 +23,7 @@
   function labelFor(element) {
     const label =
       element.getAttribute("aria-label") ||
+      element.getAttribute("placeholder") ||
       element.getAttribute("title") ||
       element.getAttribute("alt") ||
       element.getAttribute("name") ||
@@ -40,6 +41,52 @@
       rect.height > 0 &&
       (!style || (style.visibility !== "hidden" && style.display !== "none"))
     );
+  }
+
+  function interactiveSelector() {
+    return [
+      "a[href]",
+      "button",
+      "input",
+      "select",
+      "textarea",
+      "[role]",
+      "[tabindex]",
+      "summary",
+      "label"
+    ].join(",");
+  }
+
+  function deepQuery(root, selector) {
+    const matches = [];
+    if (!root || typeof root.querySelectorAll !== "function") return matches;
+    matches.push(...Array.from(root.querySelectorAll(selector)));
+    for (const element of Array.from(root.querySelectorAll("*"))) {
+      if (element.shadowRoot) matches.push(...deepQuery(element.shadowRoot, selector));
+    }
+    return matches;
+  }
+
+  function descriptorElement(element) {
+    if (!element || !(element instanceof Element)) return element;
+    const nativeSelector = 'a[href],button,input,select,textarea,summary';
+    const closestNative = element.closest(nativeSelector);
+    if (closestNative && closestNative !== element.ownerDocument.body && isVisible(closestNative)) return closestNative;
+    const childNative = deepQuery(element, nativeSelector).find(isVisible);
+    if (childNative) return childNative;
+    const closest = element.closest(interactiveSelector());
+    if (closest && closest !== element.ownerDocument.body && isVisible(closest)) return closest;
+    const child = deepQuery(element, interactiveSelector()).find(isVisible);
+    return child || element;
+  }
+
+  function uniqueElements(elements) {
+    const seen = new Set();
+    return elements.filter((element) => {
+      if (!element || seen.has(element)) return false;
+      seen.add(element);
+      return true;
+    });
   }
 
   function uniqueSelector(documentRef, selector) {
@@ -60,7 +107,17 @@
       if (uniqueSelector(documentRef, selector)) return selector;
     }
 
-    const attrs = ["data-testid", "data-test", "data-cy", "aria-label", "name", "title", "role"];
+    const attrs = [
+      "data-testid",
+      "data-test",
+      "data-cy",
+      "aria-label",
+      "placeholder",
+      "name",
+      "title",
+      "role",
+      "type"
+    ];
     for (const attr of attrs) {
       const value = element.getAttribute(attr);
       if (!value) continue;
@@ -88,13 +145,15 @@
   }
 
   function createDescriptor(element, url) {
+    const picked = descriptorElement(element);
     return {
       mode: "picker",
-      label: labelFor(element),
-      selector: stableSelector(element),
-      tagName: element.tagName.toLowerCase(),
-      textHint: visibleText(element).slice(0, 80),
-      roleHint: element.getAttribute("role") || "",
+      label: labelFor(picked),
+      selector: stableSelector(picked),
+      tagName: picked.tagName.toLowerCase(),
+      textHint: visibleText(picked).slice(0, 80),
+      roleHint: picked.getAttribute("role") || "",
+      contextHint: contextHintFor(picked),
       urlAtSelection: url
     };
   }
@@ -117,19 +176,36 @@
     return score;
   }
 
+  function confidenceMatch(element, target) {
+    let score = 0;
+    if (target.roleHint && element.getAttribute("role") === target.roleHint) score += 1;
+    if (target.textHint && visibleText(element).startsWith(target.textHint)) score += 1;
+    if (target.label && labelFor(element) === target.label) score += 1;
+    return score;
+  }
+
+  function isStructuralSelector(selector) {
+    return String(selector || "").startsWith("body >") || String(selector || "").includes(":nth-of-type");
+  }
+
+  function contextHintFor(element) {
+    return element && element.closest && element.closest('dialog[open], [aria-modal="true"], [role="dialog"]')
+      ? "dialog"
+      : "page";
+  }
+
+  function targetContextHint(target) {
+    if (target.contextHint) return target.contextHint;
+    return isStructuralSelector(target.selector) ? "page" : "any";
+  }
+
+  function matchesTargetContext(element, target) {
+    const expected = targetContextHint(target);
+    return expected === "any" || contextHintFor(element) === expected;
+  }
+
   function interactiveCandidates(documentRef) {
-    const selector = [
-      "a[href]",
-      "button",
-      "input",
-      "select",
-      "textarea",
-      "[role]",
-      "[tabindex]",
-      "summary",
-      "label"
-    ].join(",");
-    return Array.from(documentRef.querySelectorAll(selector)).filter(isVisible);
+    return deepQuery(documentRef, interactiveSelector()).filter(isVisible);
   }
 
   function elementSearchText(element) {
@@ -166,12 +242,21 @@
     if (!target || !target.selector) return { status: "missing", element: null };
     let matches = [];
     try {
-      matches = Array.from(documentRef.querySelectorAll(target.selector)).filter(isVisible);
+      matches = uniqueElements(
+        deepQuery(documentRef, target.selector)
+          .map((element) => descriptorElement(element))
+          .filter(isVisible)
+          .filter((element) => matchesTargetContext(element, target))
+      );
     } catch (_error) {
       matches = [];
     }
 
-    if (matches.length === 1) return { status: "ready", element: matches[0] };
+    if (matches.length === 1) {
+      if (!isStructuralSelector(target.selector) || confidenceMatch(matches[0], target) > 0) {
+        return { status: "ready", element: matches[0] };
+      }
+    }
     if (matches.length > 1) {
       const scored = matches
         .map((element) => ({ element, score: scoreMatch(element, target) }))
@@ -182,11 +267,16 @@
       return { status: "ambiguous", element: null };
     }
 
-    if (target.textHint || target.roleHint) {
-      const candidates = Array.from(documentRef.querySelectorAll(target.tagName || "*")).filter(isVisible);
+    if (target.label || target.textHint || target.roleHint) {
+      const candidates = uniqueElements(
+        deepQuery(documentRef, target.tagName || "*")
+          .map((element) => descriptorElement(element))
+          .filter(isVisible)
+          .filter((element) => matchesTargetContext(element, target))
+      );
       const scored = candidates
         .map((element) => ({ element, score: scoreMatch(element, target) }))
-        .filter((item) => item.score > 1)
+        .filter((item) => item.score > (target.textHint || target.roleHint ? 1 : 0))
         .sort((a, b) => b.score - a.score);
       if (scored.length === 1 || (scored[0] && scored[0].score > scored[1].score)) {
         return { status: "ready", element: scored[0].element };

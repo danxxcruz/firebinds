@@ -1,0 +1,93 @@
+name: Release Extensions
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate source and manifests
+        run: npm run validate
+
+      - name: Package Firefox extension
+        run: npm run package:firefox
+
+      - name: Package Chrome extension
+        run: npm run package:chrome
+
+      - name: Prepare release metadata
+        id: meta
+        shell: bash
+        run: |
+          version="$(node -p "require('./manifest.json').version")"
+          short_sha="${GITHUB_SHA::7}"
+          tag="v${version}-${GITHUB_RUN_NUMBER}-${short_sha}"
+
+          {
+            echo "version=${version}"
+            echo "short_sha=${short_sha}"
+            echo "tag=${tag}"
+            echo "firefox_zip=dist/firebinds-firefox-${version}.zip"
+            echo "chrome_zip=dist/firebinds-chrome-${version}.zip"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        shell: bash
+        run: |
+          tag="${{ steps.meta.outputs.tag }}"
+          git fetch --tags origin
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            tagged_commit="$(git rev-list -n 1 "${tag}")"
+            if [ "${tagged_commit}" != "${GITHUB_SHA}" ]; then
+              echo "Tag ${tag} already exists for ${tagged_commit}, not ${GITHUB_SHA}."
+              exit 1
+            fi
+          else
+            git tag "${tag}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${tag}"
+          fi
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.meta.outputs.tag }}"
+          title="Firebinds ${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.short_sha }})"
+          notes="Automated Firefox and Chrome extension packages built from commit ${{ github.sha }}."
+
+          if gh release view "${tag}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "${tag}" \
+              "${{ steps.meta.outputs.firefox_zip }}" \
+              "${{ steps.meta.outputs.chrome_zip }}" \
+              --repo "${{ github.repository }}" \
+              --clobber
+          else
+            gh release create "${tag}" \
+              "${{ steps.meta.outputs.firefox_zip }}" \
+              "${{ steps.meta.outputs.chrome_zip }}" \
+              --repo "${{ github.repository }}" \
+              --verify-tag \
+              --title "${title}" \
+              --notes "${notes}"
+          fi

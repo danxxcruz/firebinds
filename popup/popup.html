@@ -7,13 +7,73 @@
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-archive" viewBox="0 0 20 20">
+        <path d="M4 5.5h12M5.5 5.5v10h9v-10M7 9h6" />
+        <path d="M4.75 2.75h10.5l.75 2.75H4z" />
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 20 20">
+        <path d="m4.5 10.5 3.5 3.25L15.5 6" />
+      </symbol>
+      <symbol id="icon-copy" viewBox="0 0 20 20">
+        <path d="M7 7h9v9H7z" />
+        <path d="M4 13V4h9" />
+      </symbol>
+      <symbol id="icon-download" viewBox="0 0 20 20">
+        <path d="M10 3v9" />
+        <path d="m6.5 8.5 3.5 3.5 3.5-3.5" />
+        <path d="M4.5 15.5h11" />
+      </symbol>
+      <symbol id="icon-edit" viewBox="0 0 20 20">
+        <path d="M4 14.5 5 11l7.5-7.5a2 2 0 0 1 3 3L8 14l-4 1z" />
+        <path d="m11.5 4.5 3 3" />
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 20 20">
+        <path d="M10 4v12M4 10h12" />
+      </symbol>
+      <symbol id="icon-power" viewBox="0 0 20 20">
+        <path d="M10 3v7" />
+        <path d="M6.5 5.75a6 6 0 1 0 7 0" />
+      </symbol>
+      <symbol id="icon-refresh" viewBox="0 0 20 20">
+        <path d="M15.5 7.5A6 6 0 1 0 16 10" />
+        <path d="M15.5 3.75V7.5h-3.75" />
+      </symbol>
+      <symbol id="icon-sliders" viewBox="0 0 20 20">
+        <path d="M4 6h5M13 6h3M11 4v4" />
+        <path d="M4 14h3M11 14h5M9 12v4" />
+      </symbol>
+      <symbol id="icon-target" viewBox="0 0 20 20">
+        <circle cx="10" cy="10" r="6.5" />
+        <circle cx="10" cy="10" r="2" />
+        <path d="M10 1.75v3M10 15.25v3M1.75 10h3M15.25 10h3" />
+      </symbol>
+      <symbol id="icon-trash" viewBox="0 0 20 20">
+        <path d="M4 5.5h12" />
+        <path d="M7 5.5V4h6v1.5" />
+        <path d="M6 7.5 6.75 16h6.5L14 7.5" />
+      </symbol>
+      <symbol id="icon-upload" viewBox="0 0 20 20">
+        <path d="M10 12V3" />
+        <path d="m6.5 6.5 3.5-3.5 3.5 3.5" />
+        <path d="M4.5 15.5h11" />
+      </symbol>
+      <symbol id="icon-x" viewBox="0 0 20 20">
+        <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+      </symbol>
+    </svg>
     <main class="app">
       <header class="header">
-        <div>
-          <h1>Firebinds</h1>
-          <p id="pageLabel" class="muted">Loading current page...</p>
+        <div class="brand">
+          <img class="brand-icon" src="../icons/icon32.png" alt="" aria-hidden="true">
+          <div>
+            <h1>Firebinds</h1>
+            <p id="pageLabel" class="muted">Loading current page...</p>
+          </div>
         </div>
-        <button id="refreshButton" class="icon-button" type="button" title="Refresh">↻</button>
+        <button id="refreshButton" class="icon-button" type="button" title="Refresh" aria-label="Refresh">
+          <svg class="button-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+        </button>
       </header>
 
       <section id="profilePanel" class="profile-panel">
@@ -23,26 +83,48 @@
         </label>
         <span id="profileCount" class="count">0</span>
         <div class="profile-actions">
-          <button id="newProfileButton" type="button">New</button>
-          <button id="renameProfileButton" type="button">Rename</button>
-          <button id="duplicateProfileButton" type="button">Duplicate</button>
-          <button id="deleteProfileButton" type="button">Delete</button>
+          <button id="newProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-plus"></use></svg><span>New</span></button>
+          <button id="renameProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Rename</span></button>
+          <button id="duplicateProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-copy"></use></svg><span>Duplicate</span></button>
+          <button id="deleteProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Delete</span></button>
         </div>
       </section>
 
       <section id="notice" class="notice" hidden></section>
 
       <section id="controls" class="toolbar">
-        <button id="addButton" class="primary" type="button">Add keybind</button>
-        <div class="toggles">
-          <label class="switch">
-            <input id="indicatorsToggle" type="checkbox">
-            <span>Indicators</span>
-          </label>
-          <label class="switch">
-            <input id="debugKeysToggle" type="checkbox">
-            <span>Debug keys</span>
-          </label>
+        <button id="addButton" class="primary" type="button">
+          <svg class="button-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+          <span>Add keybind</span>
+        </button>
+        <div class="toolbar-menus">
+          <details class="popup-menu options-menu">
+            <summary>
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-sliders"></use></svg>
+              <span>Options</span>
+            </summary>
+            <div class="menu-popover options-actions">
+              <label class="switch menu-row">
+                <input id="indicatorsToggle" type="checkbox">
+                <span>Indicators</span>
+              </label>
+              <label class="switch menu-row">
+                <input id="debugKeysToggle" type="checkbox">
+                <span>Debug keys</span>
+              </label>
+            </div>
+          </details>
+          <details class="popup-menu backup-menu">
+            <summary>
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-archive"></use></svg>
+              <span>Backup</span>
+            </summary>
+            <div class="menu-popover backup-actions">
+              <button id="exportButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-upload"></use></svg><span>Export backup</span></button>
+              <button id="importButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-download"></use></svg><span>Import backup</span></button>
+              <input id="importFileInput" type="file" accept="application/json,.json" hidden>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -60,7 +142,7 @@
 
         <div id="pickerTargetPanel" class="target-panel">
           <p id="targetLabel" class="target">No element selected.</p>
-          <button id="pickTargetButton" type="button">Pick element</button>
+          <button id="pickTargetButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Pick element</span></button>
         </div>
 
         <label id="textTargetPanel" class="field" hidden>
@@ -96,9 +178,9 @@
         </div>
 
         <div class="actions">
-          <button id="saveButton" class="primary" type="button">Save</button>
-          <button id="testTargetButton" type="button">Test target</button>
-          <button id="cancelButton" type="button">Cancel</button>
+          <button id="saveButton" class="primary" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-check"></use></svg><span>Save</span></button>
+          <button id="testTargetButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Test target</span></button>
+          <button id="cancelButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-x"></use></svg><span>Cancel</span></button>
         </div>
       </section>
 
@@ -111,6 +193,7 @@
       </section>
     </main>
 
+    <script src="../src/api.js"></script>
     <script src="../src/messages.js"></script>
     <script src="../src/key-combo.js"></script>
     <script src="../src/targeting.js"></script>

@@ -262,6 +262,18 @@
         if (tab) await applyState(tab.id, tab.url);
         return { ok: true, binding };
       }
+      case M.EXPORT_BACKUP:
+        return { ok: true, backup: await Storage.exportBackup() };
+      case M.IMPORT_BACKUP: {
+        try {
+          const backup = await Storage.importBackup(message.backup);
+          const tab = await activeTab();
+          if (tab) await applyState(tab.id, tab.url);
+          return { ok: true, backup };
+        } catch (error) {
+          return { ok: false, reason: error.message || "Could not import backup." };
+        }
+      }
       case M.TEST_TARGET: {
         const tab = await activeTab();
         if (!tab || !tab.url || !isAllowedUrl(tab.url)) {

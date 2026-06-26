@@ -1,0 +1,12 @@
+{
+  "name": "firebinds",
+  "version": "0.2.1",
+  "private": true,
+  "scripts": {
+    "build:firefox": "node scripts/build.mjs build firefox",
+    "build:chrome": "node scripts/build.mjs build chrome",
+    "package:firefox": "node scripts/build.mjs package firefox",
+    "package:chrome": "node scripts/build.mjs package chrome",
+    "validate": "node scripts/build.mjs validate source && node scripts/build.mjs validate firefox && node scripts/build.mjs validate chrome"
+  }
+}
