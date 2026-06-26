@@ -17,6 +17,7 @@
     deleteProfileButton: document.getElementById("deleteProfileButton"),
     addButton: document.getElementById("addButton"),
     indicatorsToggle: document.getElementById("indicatorsToggle"),
+    debugKeysToggle: document.getElementById("debugKeysToggle"),
     formPanel: document.getElementById("formPanel"),
     formTitle: document.getElementById("formTitle"),
     targetModeSelect: document.getElementById("targetModeSelect"),
@@ -224,6 +225,7 @@
     els.profilePanel.hidden = false;
     els.pageLabel.textContent = pageLabel(state.page.url);
     els.indicatorsToggle.checked = Boolean(state.indicatorsVisible);
+    els.debugKeysToggle.checked = Boolean(state.debugKeys);
     renderProfiles();
     renderBindings();
 
@@ -466,6 +468,14 @@
       scopeType: "page",
       scopeValue: pageState.page.pageScope,
       visible: els.indicatorsToggle.checked
+    });
+    await loadState();
+  });
+  els.debugKeysToggle.addEventListener("change", async () => {
+    if (!pageState || !pageState.ok) return;
+    await send({
+      type: M.SET_DEBUG_KEYS,
+      enabled: els.debugKeysToggle.checked
     });
     await loadState();
   });

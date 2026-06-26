@@ -10,6 +10,8 @@
   let indicators = new Map();
   let picker = null;
   let mutationTimer = null;
+  let activeCombo = "";
+  let activeComboUntil = 0;
 
   function send(message) {
     return browser.runtime.sendMessage(message);
@@ -54,13 +56,12 @@
       if (!binding.enabled || binding.showIndicator === false) continue;
       const match = Targeting.matchTarget(document, binding.target);
       if (match.status !== "ready") {
-        send({ type: M.BINDING_STATUS, id: binding.id, status: match.status }).catch(() => {});
         continue;
       }
       const node = document.createElement("span");
       node.className = "firebinds-indicator";
       node.dataset.bindingId = binding.id;
-      node.dataset.status = binding.status || "ready";
+      node.dataset.status = match.status;
       node.textContent = binding.keyCombo;
       node.title = `Firebinds: ${binding.keyCombo}`;
       document.documentElement.appendChild(node);
@@ -137,23 +138,64 @@
   }
 
   function activateElement(element) {
-    const tag = element.tagName.toLowerCase();
-    if (tag === "input" || tag === "textarea" || tag === "select" || element.isContentEditable) {
-      element.focus();
+    const actionable = element.closest(
+      'button, a[href], input, textarea, select, [role="button"], [role="tab"], [role="menuitem"], [role="link"], [tabindex]'
+    ) || element;
+    const tag = actionable.tagName.toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select" || actionable.isContentEditable) {
+      actionable.focus();
       return;
     }
-    element.click();
+
+    actionable.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (typeof actionable.focus === "function") {
+      actionable.focus({ preventScroll: true });
+    }
+
+    const rect = actionable.getBoundingClientRect();
+    const clientX = Math.floor(rect.left + rect.width / 2);
+    const clientY = Math.floor(rect.top + rect.height / 2);
+    const baseEventInit = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX,
+      clientY,
+      screenX: global.screenX + clientX,
+      screenY: global.screenY + clientY,
+      button: 0,
+      buttons: 0
+    };
+    const mouseEventInit = { ...baseEventInit, view: document.defaultView };
+
+    for (const type of ["mouseover", "mousemove", "mousedown", "mouseup"]) {
+      actionable.dispatchEvent(new MouseEvent(type, mouseEventInit));
+    }
+
+    actionable.click();
   }
 
   function onKeyDown(event) {
     if (picker) return;
     const combo = KeyCombo.eventToCombo(event);
     if (!combo) return;
+    if (combo === activeCombo && Date.now() < activeComboUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      return;
+    }
     const binding = (pageState.bindings || []).find(
       (item) => item.enabled && item.keyCombo === combo
     );
-    if (!binding) return;
-    if (KeyCombo.isEditableTarget(event.target) && !binding.allowInEditable) return;
+    if (!binding) {
+      if (pageState.debugKeys) toast(`Saw ${combo}: no binding`);
+      return;
+    }
+    if (KeyCombo.isEditableTarget(event.target) && !binding.allowInEditable) {
+      if (pageState.debugKeys) toast(`Saw ${combo}: ignored in editable field`);
+      return;
+    }
 
     const match = Targeting.matchTarget(document, binding.target);
     if (match.status !== "ready") {
@@ -164,12 +206,23 @@
       return;
     }
 
+    if (pageState.debugKeys) toast(`Saw ${combo}: matched ${binding.target.label || binding.keyCombo}`);
+    activeCombo = combo;
+    activeComboUntil = Date.now() + 450;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
     activateElement(match.element);
     if (binding.status !== "ready") {
       send({ type: M.BINDING_STATUS, id: binding.id, status: "ready" }).catch(() => {});
+    }
+  }
+
+  function onKeyUp(event) {
+    const combo = KeyCombo.eventToCombo(event);
+    if (combo === activeCombo) {
+      activeCombo = "";
+      activeComboUntil = 0;
     }
   }
 
@@ -208,6 +261,7 @@
   });
 
   document.addEventListener("keydown", onKeyDown, true);
+  document.addEventListener("keyup", onKeyUp, true);
   global.addEventListener("scroll", refreshIndicatorsSoon, true);
   global.addEventListener("resize", refreshIndicatorsSoon);
   function mutationTouchesOnlyFirebinds(mutations) {

@@ -73,6 +73,12 @@ h2 {
   justify-content: space-between;
 }
 
+.toggles {
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+}
+
 button,
 select,
 input[type="text"],

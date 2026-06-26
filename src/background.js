@@ -52,6 +52,7 @@
     const activeProfile = await Storage.getActiveProfile();
     const bindings = await Storage.getBindingsForUrl(url);
     const indicatorsVisible = await Storage.getIndicatorsVisible(activeProfile.id, "page", pageScope);
+    const debugKeys = await Storage.getDebugKeys();
     return {
       ok: true,
       restricted: false,
@@ -60,7 +61,8 @@
       activeProfile,
       bindings,
       pendingPick,
-      indicatorsVisible
+      indicatorsVisible,
+      debugKeys
     };
   }
 
@@ -213,6 +215,12 @@
       }
       case M.SET_INDICATORS_VISIBLE: {
         await Storage.setIndicatorsVisible(message.profileId, message.scopeType, message.scopeValue, message.visible);
+        const tab = await activeTab();
+        if (tab) await applyState(tab.id, tab.url);
+        return { ok: true };
+      }
+      case M.SET_DEBUG_KEYS: {
+        await Storage.setDebugKeys(message.enabled);
         const tab = await activeTab();
         if (tab) await applyState(tab.id, tab.url);
         return { ok: true };

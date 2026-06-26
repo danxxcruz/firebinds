@@ -201,6 +201,18 @@
     return settings;
   }
 
+  async function setDebugKeys(enabled) {
+    const settings = await getSettings();
+    settings.debugKeys = Boolean(enabled);
+    await browser.storage.local.set({ [SETTINGS_KEY]: settings });
+    return settings;
+  }
+
+  async function getDebugKeys() {
+    const settings = await getSettings();
+    return Boolean(settings.debugKeys);
+  }
+
   async function getIndicatorsVisible(profileId, scopeType, scopeValue) {
     const settings = await getSettings();
     const value = settings.indicatorVisibility && settings.indicatorVisibility[scopeKey(profileId, scopeType, scopeValue)];
@@ -331,6 +343,8 @@
     findConflict,
     getIndicatorsVisible,
     setIndicatorsVisible,
+    getDebugKeys,
+    setDebugKeys,
     matchesUrl,
     listProfiles,
     getActiveProfile,
