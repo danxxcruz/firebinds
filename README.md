@@ -46,7 +46,7 @@ are happier for it.
 
 ## Demo
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/rZTAhEpd8QQ?si=iLEc62Kq3bLCMuDA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+https://github.com/user-attachments/assets/37064c3c-ff66-45d0-947f-75082c4da4c9
 
 ## What it does
 
