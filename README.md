@@ -5,7 +5,7 @@
 <h1 align="center">Firebinds</h1>
 
 <p align="center">
-  Custom keyboard shortcuts for the web, managed from one clean browser popup.
+  Bind a keyboard shortcut to literally any clickable thing on a webpage.
 </p>
 
 <p align="center">
@@ -33,16 +33,35 @@ same controls over and over and would rather press a key than chase the UI.
 Everything is configured inside the extension popup. The webpage only handles
 element picking, key listening, small shortcut indicators, and passive feedback.
 
-## Highlights
+## Why I built this
 
-- Pick elements visually, with click or `Q` confirmation.
-- Match targets by exact text or wildcard patterns.
-- Use page, site, or global scopes.
-- Create profiles for different workflows.
-- Show small on-page key indicators for bound elements.
-- Export/import backups for browser migrations.
-- Package Firefox and Chrome builds from the same source tree.
-- No external accounts, no remote service, no tracking pipeline.
+I kept doing the same thing a dozen times a day: reach for the mouse, find the
+same button or link I always click, click it, go back to typing. Repeat. It's
+a small tax, but it adds up.
+
+Firebinds lets me point at something once: a button, a link, a text input,
+whatever, and give it a key. After that I never have to go find it again. My
+hands stay on the keyboard, the repetitive stuff gets faster, and my wrists
+are happier for it.
+
+## Demo
+
+*(Recording a walkthrough video — will drop it here once it's done. Until
+then, see "How It Works" below.)*
+
+## What it does
+
+- Pick elements visually, with click or `Q` to confirm.
+- Match targets by exact text or a wildcard pattern, in case the element
+  isn't always in the same spot.
+- Scope a binding to the current page, the whole site, or globally.
+- Keep separate profiles for different sites or workflows.
+- Show small on-page indicators next to bound elements so you know what's
+  mapped.
+- Export/import backups as JSON when you switch machines or browser
+  profiles.
+- One source tree builds both the Firefox and Chrome versions.
+- No accounts, no remote service, nothing phoning home.
 
 ## Install
 
@@ -50,7 +69,7 @@ element picking, key listening, small shortcut indicators, and passive feedback.
 
 Install from Mozilla Add-ons:
 
-[![Install on Firefox](https://img.shields.io/badge/Install-Firefox%20Add--on-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/es-MX/firefox/addon/firebinds/)
+[![Install on Firefox](https://img.shields.io/badge/Install-Firefox%20Add--on-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/firebinds/)
 
 For local development:
 
@@ -67,7 +86,7 @@ just to list this there.
 
 Chrome and Chromium users can still load the extension manually:
 
-```powershell
+```
 npm run build:chrome
 ```
 
@@ -77,35 +96,35 @@ unpacked**, and choose `dist/chrome`.
 ## How It Works
 
 1. Click **Add keybind** in the popup.
-2. Choose a target method:
-   - **Pick element** to select a specific element on the page.
-   - **Text** to match an interactive element by exact label/text.
-   - **Text pattern** to match a wildcard such as `Add New*`.
-3. Choose page, site, or global scope.
-4. Press the desired key combination.
-5. Save, then use the shortcut on the page.
+2. Choose how to target the element:
+   - **Pick element** — click it directly on the page.
+   - **Text** — match by exact label/text.
+   - **Text pattern** — wildcard match.
+3. Pick a scope: page, site, or global.
+4. Press the key combo you want.
+5. Save, then use it on the page.
 
-The popup also lets you edit, duplicate, test, disable, reselect, and delete
-bindings. Indicators and debug logging live under **Options**.
+From the popup you can also edit, duplicate, test, disable, reselect, or
+delete any binding. Indicators and debug logging live under **Options**.
 
 ## Profiles And Backups
 
-Firebinds creates a **Default** profile automatically. Use the profile controls
-to create, rename, duplicate, delete, or switch profiles. Only the active
-profile's bindings apply to the current page.
+Firebinds creates a **Default** profile automatically. Use the profile
+controls to create, rename, duplicate, delete, or switch profiles — only the
+active profile's bindings apply to the current page.
 
-Use **Backup > Export backup** to save profiles, keybinds, and settings as JSON.
-Use **Backup > Import backup** to restore that file in another browser profile
-or device. Importing replaces the current Firebinds data after confirmation.
+**Backup → Export backup** saves everything (profiles, keybinds, settings) as
+JSON. **Backup → Import backup** restores that file on another browser or
+machine. Importing replaces whatever's currently there, after confirming.
 
 ## Privacy
 
-Firebinds stores configuration in browser extension storage. It does not require
-an account, does not phone home, and does not collect personal data.
+Firebinds stores its config in the browser's local extension storage. No
+account, no telemetry, no remote calls.
 
-The extension asks for broad webpage access because content scripts need to run
-on pages where you want shortcuts. The actual binding setup still happens in the
-popup, and backup files are created locally by your browser.
+It does ask for broad webpage access, because the content script needs to run
+on whatever page you want shortcuts on — but all the actual setup happens in
+the popup, and backups are generated locally in your own browser.
 
 ## Build
 
@@ -129,8 +148,15 @@ Build output is written to `dist/` and ignored by Git.
 
 ## Releases
 
-Pushing to `main` runs the release workflow. It validates the source, packages
-Firefox and Chrome zips, creates a GitHub release, and uploads both artifacts.
+Every push to `main` runs CI, which validates the source, packages both
+Firefox and Chrome builds, and cuts a GitHub release automatically. Useful,
+but it means `main` should always be in a state you're fine shipping — no
+pushing half-finished work there for now.
 
-Browser stores require monotonically increasing extension versions, so bump
-`manifest.json` and `package.json` before uploading a new public build.
+Browser stores require version numbers to only go up, so bump `manifest.json`
+and `package.json` before uploading a new public build.
+
+## License
+
+[MPL 2.0](LICENSE)
+
