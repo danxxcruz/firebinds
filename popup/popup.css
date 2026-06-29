@@ -140,6 +140,13 @@ input:focus-visible,
   box-shadow: 0 0 0 3px var(--focus);
 }
 
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .app {
   display: grid;
   gap: 12px;
@@ -382,6 +389,19 @@ button:active,
   background: var(--surface-hover);
 }
 
+.menu-popover .danger {
+  color: var(--text);
+}
+
+.menu-popover .danger .button-icon {
+  color: var(--danger);
+}
+
+.menu-popover .danger:hover,
+.menu-popover .danger:focus-visible {
+  color: var(--danger);
+}
+
 .options-actions {
   min-width: 136px;
 }
@@ -541,6 +561,8 @@ button:active,
   padding: 3px 8px;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
+  box-shadow: var(--control-shadow);
   white-space: nowrap;
 }
 

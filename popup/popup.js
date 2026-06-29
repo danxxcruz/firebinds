@@ -93,6 +93,21 @@
     els.notice.classList.toggle("error", kind === "error");
   }
 
+  function popupMenus() {
+    return Array.from(document.querySelectorAll(".popup-menu"));
+  }
+
+  function closePopupMenus(exceptMenu, restoreFocus = false) {
+    for (const menu of popupMenus()) {
+      if (menu === exceptMenu || !menu.open) continue;
+      menu.open = false;
+      if (restoreFocus) {
+        const summary = menu.querySelector("summary");
+        if (summary) summary.focus();
+      }
+    }
+  }
+
   function pageLabel(url) {
     try {
       const parsed = new URL(url);
@@ -241,7 +256,7 @@
         <div class="binding-actions">
           <button class="binding-edit" type="button"></button>
           <details class="popup-menu more-menu binding-menu">
-            <summary title="More actions" aria-label="More binding actions">
+            <summary title="More actions" aria-label="More binding actions" aria-haspopup="menu">
               <svg class="button-icon" aria-hidden="true"><use href="#icon-more"></use></svg>
             </summary>
             <div class="menu-popover binding-menu-actions"></div>
@@ -549,11 +564,22 @@
   els.renameProfileButton.addEventListener("click", renameProfile);
   els.duplicateProfileButton.addEventListener("click", duplicateProfile);
   els.deleteProfileButton.addEventListener("click", deleteProfile);
-  els.optionsMenu.addEventListener("toggle", () => {
-    if (els.optionsMenu.open && els.backupMenu) els.backupMenu.open = false;
+  document.addEventListener("toggle", (event) => {
+    const menu = event.target && event.target.closest ? event.target.closest(".popup-menu") : null;
+    if (menu && menu.open) closePopupMenus(menu);
+  }, true);
+  document.addEventListener("click", (event) => {
+    const menu = event.target && event.target.closest ? event.target.closest(".popup-menu") : null;
+    if (!menu) {
+      closePopupMenus();
+      return;
+    }
+    if (event.target.closest(".menu-popover button")) {
+      menu.open = false;
+    }
   });
-  els.backupMenu.addEventListener("toggle", () => {
-    if (els.backupMenu.open && els.optionsMenu) els.optionsMenu.open = false;
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closePopupMenus(null, true);
   });
   els.exportButton.addEventListener("click", exportBackup);
   els.importButton.addEventListener("click", () => {
