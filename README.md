@@ -147,10 +147,10 @@ Build output is written to `dist/` and ignored by Git.
 
 ## Releases
 
-Every push to `main` runs CI, which validates the source, packages both
-Firefox and Chrome builds, and cuts a GitHub release automatically. Useful,
-but it means `main` should always be in a state you're fine shipping — no
-pushing half-finished work there for now.
+Every push to `main` runs CI and validates the source. A GitHub release is
+only created when `manifest.json` has a version whose tag (`v<version>`) does
+not already exist. In other words: pushes always validate, but publishing only
+happens once per new version.
 
 Browser stores require version numbers to only go up, so bump `manifest.json`
 and `package.json` before uploading a new public build.
@@ -158,4 +158,3 @@ and `package.json` before uploading a new public build.
 ## License
 
 [MPL 2.0](LICENSE)
-
