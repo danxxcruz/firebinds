@@ -238,36 +238,40 @@
           </div>
           <span class="combo"></span>
         </div>
-        <div class="binding-actions"></div>
+        <div class="binding-actions">
+          <button class="binding-edit" type="button"></button>
+          <details class="popup-menu more-menu binding-menu">
+            <summary title="More actions" aria-label="More binding actions">
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-more"></use></svg>
+            </summary>
+            <div class="menu-popover binding-menu-actions"></div>
+          </details>
+        </div>
       `;
 
       item.querySelector("strong").textContent = bindingTargetLabel(binding.target);
       item.querySelector(".muted").textContent = `${scopeLabel(binding)} · ${targetModeFor(binding.target)} · ${statusText(binding)}`;
       item.querySelector(".combo").textContent = binding.keyCombo || "unset";
-      const actions = item.querySelector(".binding-actions");
+      const editButton = item.querySelector(".binding-edit");
+      const menuActions = item.querySelector(".binding-menu-actions");
 
-      actions.append(
-        button("Edit", () => editBinding(binding)),
-        button("Duplicate", () => duplicateBinding(binding)),
+      setButtonContent(editButton, "Edit", BUTTON_ICONS.Edit);
+      editButton.addEventListener("click", () => editBinding(binding));
+      menuActions.append(
         button("Test", () => testTarget(binding.target)),
+        button("Duplicate", () => duplicateBinding(binding)),
         button(binding.enabled ? "Disable" : "Enable", () => toggleBinding(binding)),
-        button("Delete", () => deleteBinding(binding))
+        button("Delete", () => deleteBinding(binding), { danger: true })
       );
       els.bindingsList.appendChild(item);
     }
   }
 
-  function button(label, onClick) {
+  function button(label, onClick, options = {}) {
     const node = document.createElement("button");
     node.type = "button";
     setButtonContent(node, label, BUTTON_ICONS[label]);
-    if (label === "Delete") {
-      node.classList.add("danger", "icon-only");
-      node.title = "Delete binding";
-      node.setAttribute("aria-label", "Delete binding");
-      const text = node.querySelector("span");
-      if (text) text.remove();
-    }
+    if (options.danger) node.classList.add("danger");
     node.addEventListener("click", onClick);
     return node;
   }
