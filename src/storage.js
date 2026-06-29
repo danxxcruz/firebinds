@@ -7,6 +7,7 @@
   const DEFAULT_PROFILE_ID = "profile-default";
   const GLOBAL_SCOPE_VALUE = "*";
   const BACKUP_SCHEMA_VERSION = 1;
+  const DEFAULT_INDICATOR_OPACITY = 1;
 
   let initPromise = null;
 
@@ -45,6 +46,12 @@
       throw new Error(`Backup ${name} must be an object.`);
     }
     return value;
+  }
+
+  function normalizedIndicatorOpacity(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return DEFAULT_INDICATOR_OPACITY;
+    return Math.min(1, Math.max(0.35, Math.round(number * 100) / 100));
   }
 
   async function ensureInitialized() {
@@ -87,6 +94,16 @@
     });
 
     settings.indicatorVisibility = settings.indicatorVisibility || {};
+    if (settings.indicatorOpacity === undefined) {
+      settings.indicatorOpacity = DEFAULT_INDICATOR_OPACITY;
+      changed = true;
+    } else {
+      const normalizedOpacity = normalizedIndicatorOpacity(settings.indicatorOpacity);
+      if (settings.indicatorOpacity !== normalizedOpacity) {
+        settings.indicatorOpacity = normalizedOpacity;
+        changed = true;
+      }
+    }
 
     if (changed) {
       await browser.storage.local.set({
@@ -203,7 +220,7 @@
   async function getSettings() {
     await ensureInitialized();
     const result = await rawGet(SETTINGS_KEY);
-    return result[SETTINGS_KEY] || { indicatorVisibility: {} };
+    return result[SETTINGS_KEY] || { indicatorVisibility: {}, indicatorOpacity: DEFAULT_INDICATOR_OPACITY };
   }
 
   async function setIndicatorsVisible(profileId, scopeType, scopeValue, visible) {
@@ -219,6 +236,18 @@
     settings.debugKeys = Boolean(enabled);
     await browser.storage.local.set({ [SETTINGS_KEY]: settings });
     return settings;
+  }
+
+  async function setIndicatorOpacity(opacity) {
+    const settings = await getSettings();
+    settings.indicatorOpacity = normalizedIndicatorOpacity(opacity);
+    await browser.storage.local.set({ [SETTINGS_KEY]: settings });
+    return settings.indicatorOpacity;
+  }
+
+  async function getIndicatorOpacity() {
+    const settings = await getSettings();
+    return normalizedIndicatorOpacity(settings.indicatorOpacity);
   }
 
   async function getDebugKeys() {
@@ -403,6 +432,8 @@
     findConflict,
     getIndicatorsVisible,
     setIndicatorsVisible,
+    getIndicatorOpacity,
+    setIndicatorOpacity,
     getDebugKeys,
     setDebugKeys,
     matchesUrl,

@@ -2,6 +2,19 @@
   const Firebinds = global.Firebinds || (global.Firebinds = {});
 
   const MODIFIER_KEYS = new Set(["Control", "Alt", "Shift", "Meta"]);
+  const CODE_KEY_NAMES = {
+    Backquote: "`",
+    Minus: "-",
+    Equal: "=",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Backslash: "\\",
+    Semicolon: ";",
+    Quote: "'",
+    Comma: ",",
+    Period: ".",
+    Slash: "/"
+  };
   const RESERVED = new Set([
     "Ctrl+L",
     "Ctrl+T",
@@ -24,6 +37,13 @@
 
   function keyName(event) {
     if (!event || MODIFIER_KEYS.has(event.key)) return "";
+    if (event.code && event.code.startsWith("Key")) return event.code.slice(3);
+    if (event.code && event.code.startsWith("Digit")) return event.code.slice(5);
+    if (event.code && event.code.startsWith("Numpad")) {
+      const key = event.code.slice(6);
+      return /^\d$/.test(key) ? `Num${key}` : `Num${key}`;
+    }
+    if (event.code && CODE_KEY_NAMES[event.code]) return CODE_KEY_NAMES[event.code];
     if (event.key === " ") return "Space";
     if (event.key === "Esc") return "Escape";
     if (event.key && event.key.length === 1) return event.key.toUpperCase();
