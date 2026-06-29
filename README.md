@@ -94,7 +94,7 @@ unpacked**, and choose `dist/chrome`.
 
 ## How It Works
 
-1. Click **Add keybind** in the popup.
+1. Click **Add shortcut** in the popup.
 2. Choose how to target the element:
    - **Pick element** — click it directly on the page.
    - **Text** — match by exact label/text.
@@ -110,9 +110,9 @@ delete any binding. Indicators and debug logging live under **Options**.
 
 Firebinds creates a **Default** profile automatically. Use the profile
 controls to create, rename, duplicate, delete, or switch profiles — only the
-active profile's bindings apply to the current page.
+active profile's shortcuts apply to the current page.
 
-**Backup → Export backup** saves everything (profiles, keybinds, settings) as
+**Backup → Export backup** saves everything (profiles, shortcuts, settings) as
 JSON. **Backup → Import backup** restores that file on another browser or
 machine. Importing replaces whatever's currently there, after confirming.
 

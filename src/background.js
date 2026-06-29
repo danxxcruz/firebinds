@@ -35,13 +35,17 @@
 
   async function stateForUrl(url) {
     if (!isAllowedUrl(url)) {
+      const indicatorOpacity = await Storage.getIndicatorOpacity();
+      const debugKeys = await Storage.getDebugKeys();
       return {
         ok: false,
         restricted: true,
         reason: "Firebinds can only run on normal webpages.",
         bindings: [],
         pendingPick: null,
-        indicatorsVisible: false
+        indicatorsVisible: false,
+        indicatorOpacity,
+        debugKeys
       };
     }
 
@@ -52,6 +56,7 @@
     const activeProfile = await Storage.getActiveProfile();
     const bindings = await Storage.getBindingsForUrl(url);
     const indicatorsVisible = await Storage.getIndicatorsVisible(activeProfile.id, "page", pageScope);
+    const indicatorOpacity = await Storage.getIndicatorOpacity();
     const debugKeys = await Storage.getDebugKeys();
     return {
       ok: true,
@@ -62,6 +67,7 @@
       bindings,
       pendingPick,
       indicatorsVisible,
+      indicatorOpacity,
       debugKeys
     };
   }
@@ -165,7 +171,7 @@
       completedAt: new Date().toISOString()
     };
     await browser.action.setBadgeText({ text: "1" });
-    await browser.action.setTitle({ title: "Firebinds: finish the keybind in the popup" });
+    await browser.action.setTitle({ title: "Firebinds: finish the shortcut in the popup" });
     try {
       await browser.action.openPopup();
     } catch (_error) {
@@ -218,6 +224,12 @@
         const tab = await activeTab();
         if (tab) await applyState(tab.id, tab.url);
         return { ok: true };
+      }
+      case M.SET_INDICATOR_OPACITY: {
+        const indicatorOpacity = await Storage.setIndicatorOpacity(message.opacity);
+        const tab = await activeTab();
+        if (tab) await applyState(tab.id, tab.url);
+        return { ok: true, indicatorOpacity };
       }
       case M.SET_DEBUG_KEYS: {
         await Storage.setDebugKeys(message.enabled);

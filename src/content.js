@@ -6,7 +6,7 @@
   const KeyCombo = global.Firebinds.KeyCombo;
   const Targeting = global.Firebinds.Targeting;
 
-  let pageState = { bindings: [], indicatorsVisible: true };
+  let pageState = { bindings: [], indicatorsVisible: true, indicatorOpacity: 1 };
   let indicators = new Map();
   let picker = null;
   let mutationTimer = null;
@@ -122,6 +122,7 @@
       node.dataset.status = match.status;
       node.textContent = binding.keyCombo;
       node.title = `Firebinds: ${binding.keyCombo}`;
+      node.style.opacity = String(pageState.indicatorOpacity || 1);
       document.documentElement.appendChild(node);
       positionIndicator(node, match.element);
       if (isIndicatorOccluded(node, match.element)) {
@@ -164,7 +165,7 @@
     debugLog("Picked target", target);
     stopPicker(false);
     send({ type: M.PICKER_RESULT, target }).catch(() => {});
-    toast("Element selected. Finish the keybind in the popup.");
+    toast("Element selected. Finish the shortcut in the popup.");
   }
 
   function blockPickerPointerEvent(event) {
@@ -309,7 +310,7 @@
         target: binding.target
       });
       send({ type: M.BINDING_STATUS, id: binding.id, status: match.status }).catch(() => {});
-      toast(match.status === "ambiguous" ? "This keybind needs re-selection." : "Target not found.");
+      toast(match.status === "ambiguous" ? "This shortcut needs re-selection." : "Target not found.");
       return;
     }
 

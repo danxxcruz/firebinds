@@ -6,7 +6,11 @@
   const els = {
     pageLabel: document.getElementById("pageLabel"),
     notice: document.getElementById("notice"),
+    mainView: document.getElementById("mainView"),
+    settingsView: document.getElementById("settingsView"),
     controls: document.getElementById("controls"),
+    settingsButton: document.getElementById("settingsButton"),
+    settingsBackButton: document.getElementById("settingsBackButton"),
     refreshButton: document.getElementById("refreshButton"),
     profilePanel: document.getElementById("profilePanel"),
     profileSelect: document.getElementById("profileSelect"),
@@ -15,13 +19,13 @@
     renameProfileButton: document.getElementById("renameProfileButton"),
     duplicateProfileButton: document.getElementById("duplicateProfileButton"),
     deleteProfileButton: document.getElementById("deleteProfileButton"),
-    optionsMenu: document.querySelector(".options-menu"),
-    backupMenu: document.querySelector(".backup-menu"),
     exportButton: document.getElementById("exportButton"),
     importButton: document.getElementById("importButton"),
     importFileInput: document.getElementById("importFileInput"),
     addButton: document.getElementById("addButton"),
     indicatorsToggle: document.getElementById("indicatorsToggle"),
+    indicatorOpacityRange: document.getElementById("indicatorOpacityRange"),
+    indicatorOpacityValue: document.getElementById("indicatorOpacityValue"),
     debugKeysToggle: document.getElementById("debugKeysToggle"),
     formPanel: document.getElementById("formPanel"),
     formTitle: document.getElementById("formTitle"),
@@ -46,6 +50,8 @@
 
   let pageState = null;
   let form = null;
+  let view = "main";
+  let viewTransitionTimer = 0;
 
   const BUTTON_ICONS = {
     Edit: "edit",
@@ -85,6 +91,83 @@
       return;
     }
     node.textContent = label;
+  }
+
+  function showView(nextView, focusBackButton = true) {
+    if (nextView === view) {
+      els.mainView.hidden = view !== "main";
+      els.settingsView.hidden = view !== "settings";
+      if (view === "settings" && focusBackButton) els.settingsBackButton.focus();
+      return;
+    }
+
+    const previousView = view;
+    const entering = nextView === "settings" ? els.settingsView : els.mainView;
+    const leaving = previousView === "settings" ? els.settingsView : els.mainView;
+    const reverse = nextView === "main";
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    view = nextView;
+    closePopupMenus();
+
+    window.clearTimeout(viewTransitionTimer);
+    entering.classList.remove("view-transition", "view-entering", "view-leaving", "is-active", "view-reverse");
+    leaving.classList.remove("view-transition", "view-entering", "view-leaving", "is-active", "view-reverse");
+
+    if (reducedMotion) {
+      els.mainView.hidden = view !== "main";
+      els.settingsView.hidden = view !== "settings";
+      if (view === "settings" && focusBackButton) els.settingsBackButton.focus();
+      return;
+    }
+
+    leaving.classList.add("view-transition", "view-leaving");
+    if (reverse) leaving.classList.add("view-reverse");
+
+    requestAnimationFrame(() => {
+      leaving.classList.add("is-active");
+    });
+
+    viewTransitionTimer = window.setTimeout(() => {
+      leaving.hidden = true;
+      leaving.classList.remove("view-transition", "view-leaving", "is-active", "view-reverse");
+
+      entering.hidden = false;
+      entering.classList.add("view-transition", "view-entering");
+      if (reverse) entering.classList.add("view-reverse");
+
+      requestAnimationFrame(() => {
+        entering.classList.add("is-active");
+      });
+
+      viewTransitionTimer = window.setTimeout(() => {
+        entering.classList.remove("view-transition", "view-entering", "is-active", "view-reverse");
+        if (view === "settings" && focusBackButton) els.settingsBackButton.focus();
+      }, 120);
+    }, 90);
+  }
+
+  function opacityLabel(value) {
+    return `${Math.round(Number(value || 1) * 100)}%`;
+  }
+
+  function syncOpacityControl(value) {
+    const opacity = Number(value || 1);
+    const min = Number(els.indicatorOpacityRange.min);
+    const max = Number(els.indicatorOpacityRange.max);
+    const progress = ((opacity - min) / (max - min)) * 100;
+    els.indicatorOpacityRange.value = String(opacity);
+    els.indicatorOpacityRange.style.setProperty("--range-progress", `${Math.max(0, Math.min(100, progress))}%`);
+    els.indicatorOpacityValue.textContent = opacityLabel(opacity);
+  }
+
+  function syncSettingsUi(state) {
+    const ok = Boolean(state && state.ok);
+    const opacity = Number(state && state.indicatorOpacity ? state.indicatorOpacity : 1);
+    els.indicatorsToggle.checked = Boolean(state && state.indicatorsVisible);
+    els.indicatorsToggle.disabled = !ok;
+    syncOpacityControl(opacity);
+    els.debugKeysToggle.checked = Boolean(state && state.debugKeys);
   }
 
   function showNotice(text, kind) {
@@ -183,7 +266,7 @@
 
     if (!form) return;
     const mode = targetModeFor(form.target);
-    els.formTitle.textContent = form.id ? "Edit keybind" : "New keybind";
+    els.formTitle.textContent = form.id ? "Edit shortcut" : "New shortcut";
     els.targetModeSelect.value = form.targetMode || mode;
     els.textTargetInput.value = form.target && form.target.textQuery ? form.target.textQuery : "";
     els.scopeSelect.value = form.scopeType || "page";
@@ -237,7 +320,7 @@
     if (!bindings.length) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = query ? "No matching keybinds." : "No keybinds for this page yet.";
+      empty.textContent = query ? "No matching shortcuts." : "No shortcuts for this page yet.";
       els.bindingsList.appendChild(empty);
       return;
     }
@@ -300,6 +383,7 @@
       els.pageLabel.textContent = state.reason || "Unsupported page";
       els.controls.hidden = true;
       els.profilePanel.hidden = true;
+      syncSettingsUi(state);
       showNotice(state.reason || "This page is not available to Firebinds.", "error");
       renderBindings();
       return;
@@ -308,8 +392,7 @@
     els.controls.hidden = false;
     els.profilePanel.hidden = false;
     els.pageLabel.textContent = pageLabel(state.page.url);
-    els.indicatorsToggle.checked = Boolean(state.indicatorsVisible);
-    els.debugKeysToggle.checked = Boolean(state.debugKeys);
+    syncSettingsUi(state);
     renderProfiles();
     renderBindings();
 
@@ -323,8 +406,9 @@
         keyCombo: existing ? existing.keyCombo : "",
         allowInEditable: existing ? existing.allowInEditable : false
       });
-      showNotice("Element selected. Finish and save the keybind here.", "");
+      showNotice("Element selected. Finish and save the shortcut here.", "");
     }
+    if (view === "settings") showView("settings", false);
   }
 
   async function startPicker(bindingId) {
@@ -355,7 +439,7 @@
     }
     await loadState();
     editBinding(result.binding);
-    showNotice("Duplicate created. Choose a keybind and save it.", "");
+    showNotice("Duplicate created. Choose a shortcut and save it.", "");
   }
 
   async function toggleBinding(binding) {
@@ -458,7 +542,7 @@
     if (!result.ok && result.conflict) {
       els.conflictPanel.hidden = false;
       els.conflictText.textContent = result.reason;
-      showNotice("Resolve the duplicate keybind before saving.", "error");
+      showNotice("Resolve the duplicate shortcut before saving.", "error");
       return;
     }
     if (!result.ok) {
@@ -513,7 +597,7 @@
 
   async function deleteProfile() {
     if (!pageState || !pageState.activeProfile) return;
-    if (!confirm(`Delete profile "${pageState.activeProfile.name}" and its bindings?`)) return;
+    if (!confirm(`Delete profile "${pageState.activeProfile.name}" and its shortcuts?`)) return;
     const result = await send({ type: M.DELETE_PROFILE, id: pageState.activeProfile.id });
     if (!result.ok) {
       showNotice(result.reason || "Could not delete profile.", "error");
@@ -530,7 +614,6 @@
       return;
     }
     downloadJson(backupFileName(), result.backup);
-    if (els.backupMenu) els.backupMenu.open = false;
     showNotice("Backup exported.", "");
   }
 
@@ -538,7 +621,7 @@
     if (!file) return;
     try {
       const backup = JSON.parse(await file.text());
-      if (!confirm("Importing this backup will replace all current Firebinds profiles and keybinds.")) return;
+      if (!confirm("Importing this backup will replace all current Firebinds profiles and shortcuts.")) return;
       const result = await send({ type: M.IMPORT_BACKUP, backup });
       if (!result.ok) {
         showNotice(result.reason || "Could not import backup.", "error");
@@ -555,6 +638,8 @@
   }
 
   els.refreshButton.addEventListener("click", loadState);
+  els.settingsButton.addEventListener("click", () => showView("settings"));
+  els.settingsBackButton.addEventListener("click", () => showView("main"));
   els.profileSelect.addEventListener("change", async () => {
     await send({ type: M.SET_ACTIVE_PROFILE, id: els.profileSelect.value });
     setForm(null);
@@ -583,7 +668,6 @@
   });
   els.exportButton.addEventListener("click", exportBackup);
   els.importButton.addEventListener("click", () => {
-    if (els.backupMenu) els.backupMenu.open = false;
     els.importFileInput.click();
   });
   els.importFileInput.addEventListener("change", () => importBackupFile(els.importFileInput.files[0]));
@@ -609,12 +693,29 @@
     });
     await loadState();
   });
+  els.indicatorOpacityRange.addEventListener("input", () => {
+    syncOpacityControl(els.indicatorOpacityRange.value);
+  });
+  els.indicatorOpacityRange.addEventListener("change", async () => {
+    const result = await send({
+      type: M.SET_INDICATOR_OPACITY,
+      opacity: Number(els.indicatorOpacityRange.value)
+    });
+    if (!result.ok) {
+      showNotice(result.reason || "Could not update indicator opacity.", "error");
+      return;
+    }
+    await loadState();
+  });
   els.debugKeysToggle.addEventListener("change", async () => {
-    if (!pageState || !pageState.ok) return;
-    await send({
+    const result = await send({
       type: M.SET_DEBUG_KEYS,
       enabled: els.debugKeysToggle.checked
     });
+    if (!result.ok) {
+      showNotice(result.reason || "Could not update debug setting.", "error");
+      return;
+    }
     await loadState();
   });
   els.keyCapture.addEventListener("click", () => {
