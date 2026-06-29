@@ -6,6 +6,9 @@
   const els = {
     pageLabel: document.getElementById("pageLabel"),
     notice: document.getElementById("notice"),
+    header: document.querySelector(".header"),
+    headerBrand: document.querySelector(".brand"),
+    headerActions: document.querySelector(".header-actions"),
     mainView: document.getElementById("mainView"),
     settingsView: document.getElementById("settingsView"),
     controls: document.getElementById("controls"),
@@ -93,10 +96,39 @@
     node.textContent = label;
   }
 
+  function clearHeaderTransitionClasses() {
+    for (const node of [els.headerBrand, els.headerActions]) {
+      node.classList.remove("header-transition", "header-leaving", "header-entering", "is-active");
+    }
+  }
+
+  function animateHeaderOut() {
+    els.headerBrand.classList.add("header-transition", "header-leaving");
+    els.headerActions.classList.add("header-transition", "header-leaving");
+    requestAnimationFrame(() => {
+      els.headerBrand.classList.add("is-active");
+      els.headerActions.classList.add("is-active");
+    });
+  }
+
+  function prepareHeaderIn() {
+    els.header.hidden = false;
+    els.headerBrand.classList.add("header-transition", "header-entering");
+    els.headerActions.classList.add("header-transition", "header-entering");
+  }
+
+  function animateHeaderIn() {
+    requestAnimationFrame(() => {
+      els.headerBrand.classList.add("is-active");
+      els.headerActions.classList.add("is-active");
+    });
+  }
+
   function showView(nextView, focusBackButton = true) {
     if (nextView === view) {
       els.mainView.hidden = view !== "main";
       els.settingsView.hidden = view !== "settings";
+      els.header.hidden = view === "settings";
       if (view === "settings" && focusBackButton) els.settingsBackButton.focus();
       return;
     }
@@ -105,6 +137,7 @@
     const entering = nextView === "settings" ? els.settingsView : els.mainView;
     const leaving = previousView === "settings" ? els.settingsView : els.mainView;
     const reverse = nextView === "main";
+    const toSettings = nextView === "settings";
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     view = nextView;
@@ -113,13 +146,17 @@
     window.clearTimeout(viewTransitionTimer);
     entering.classList.remove("view-transition", "view-entering", "view-leaving", "is-active", "view-reverse");
     leaving.classList.remove("view-transition", "view-entering", "view-leaving", "is-active", "view-reverse");
+    clearHeaderTransitionClasses();
 
     if (reducedMotion) {
       els.mainView.hidden = view !== "main";
       els.settingsView.hidden = view !== "settings";
+      els.header.hidden = view === "settings";
       if (view === "settings" && focusBackButton) els.settingsBackButton.focus();
       return;
     }
+
+    if (toSettings) animateHeaderOut();
 
     leaving.classList.add("view-transition", "view-leaving");
     if (reverse) leaving.classList.add("view-reverse");
@@ -132,16 +169,25 @@
       leaving.hidden = true;
       leaving.classList.remove("view-transition", "view-leaving", "is-active", "view-reverse");
 
+      if (toSettings) {
+        els.header.hidden = true;
+        clearHeaderTransitionClasses();
+      } else {
+        prepareHeaderIn();
+      }
+
       entering.hidden = false;
       entering.classList.add("view-transition", "view-entering");
       if (reverse) entering.classList.add("view-reverse");
 
       requestAnimationFrame(() => {
         entering.classList.add("is-active");
+        if (!toSettings) animateHeaderIn();
       });
 
       viewTransitionTimer = window.setTimeout(() => {
         entering.classList.remove("view-transition", "view-entering", "is-active", "view-reverse");
+        if (!toSettings) clearHeaderTransitionClasses();
         if (view === "settings" && focusBackButton) els.settingsBackButton.focus();
       }, 120);
     }, 90);
