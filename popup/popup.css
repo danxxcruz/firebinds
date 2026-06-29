@@ -76,7 +76,7 @@
 
 body {
   width: 380px;
-  min-height: 280px;
+  min-height: 460px;
   margin: 0;
   background: var(--bg);
   color: var(--text);
@@ -151,13 +151,15 @@ input:disabled {
   display: grid;
   gap: 12px;
   max-height: min(640px, 100vh);
+  min-height: 460px;
+  align-content: start;
   overflow-y: auto;
   padding: 14px;
 }
 
 .header {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
@@ -255,15 +257,19 @@ button:active,
 }
 
 .icon-button {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
   padding: 0;
-  border-radius: 9px;
+  border-radius: 12px;
+  background: var(--surface-solid);
+  box-shadow: var(--control-shadow), 0 8px 18px rgba(0, 0, 0, 0.06);
 }
 
 .icon-button .button-icon {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .panel,
