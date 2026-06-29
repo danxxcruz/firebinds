@@ -31,6 +31,11 @@
       <symbol id="icon-plus" viewBox="0 0 20 20">
         <path d="M10 4v12M4 10h12" />
       </symbol>
+      <symbol id="icon-more" viewBox="0 0 20 20">
+        <circle cx="10" cy="4.5" r="1.1" />
+        <circle cx="10" cy="10" r="1.1" />
+        <circle cx="10" cy="15.5" r="1.1" />
+      </symbol>
       <symbol id="icon-power" viewBox="0 0 20 20">
         <path d="M10 3v7" />
         <path d="M6.5 5.75a6 6 0 1 0 7 0" />
@@ -99,7 +104,7 @@
         </button>
         <div class="toolbar-menus">
           <details class="popup-menu options-menu">
-            <summary>
+            <summary aria-label="Options" aria-haspopup="menu">
               <svg class="button-icon" aria-hidden="true"><use href="#icon-sliders"></use></svg>
               <span>Options</span>
             </summary>
@@ -115,7 +120,7 @@
             </div>
           </details>
           <details class="popup-menu backup-menu">
-            <summary>
+            <summary aria-label="Backup" aria-haspopup="menu">
               <svg class="button-icon" aria-hidden="true"><use href="#icon-archive"></use></svg>
               <span>Backup</span>
             </summary>

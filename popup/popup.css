@@ -1,18 +1,19 @@
 :root {
   color-scheme: light dark;
-  --bg: #f5f5f7;
-  --surface: rgba(255, 255, 255, 0.86);
+  --bg: #f7f7f8;
+  --surface: rgba(255, 255, 255, 0.82);
   --surface-solid: #ffffff;
-  --surface-muted: #e8e8ed;
+  --surface-muted: #ececf0;
+  --surface-hover: #f1f1f4;
   --text: #1d1d1f;
   --text-muted: #6e6e73;
   --text-soft: #86868b;
-  --border: rgba(60, 60, 67, 0.18);
-  --border-strong: rgba(60, 60, 67, 0.28);
+  --border: rgba(60, 60, 67, 0.14);
+  --border-strong: rgba(60, 60, 67, 0.24);
   --accent: #007aff;
   --accent-hover: #0068d9;
   --accent-text: #ffffff;
-  --combo-bg: #1d1d1f;
+  --combo-bg: #222226;
   --combo-text: #ffffff;
   --warning-bg: #fff8e7;
   --warning-text: #7a4b00;
@@ -23,7 +24,8 @@
   --danger-border: rgba(255, 59, 48, 0.34);
   --danger-focus: rgba(255, 59, 48, 0.2);
   --focus: rgba(0, 122, 255, 0.22);
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
+  --control-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
   font: 13px/1.38 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -31,10 +33,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1c1e;
-    --surface: rgba(44, 44, 46, 0.86);
+    --bg: #1f1f21;
+    --surface: rgba(44, 44, 46, 0.78);
     --surface-solid: #2c2c2e;
     --surface-muted: #3a3a3c;
+    --surface-hover: #363638;
     --text: #f5f5f7;
     --text-muted: #a1a1a6;
     --text-soft: #8e8e93;
@@ -54,7 +57,8 @@
     --danger-border: rgba(255, 69, 58, 0.38);
     --danger-focus: rgba(255, 69, 58, 0.25);
     --focus: rgba(10, 132, 255, 0.28);
-    --shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+    --shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+    --control-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
   }
 }
 
@@ -71,8 +75,8 @@
 }
 
 body {
-  width: 360px;
-  min-height: 280px;
+  width: 380px;
+  min-height: 460px;
   margin: 0;
   background: var(--bg);
   color: var(--text);
@@ -82,13 +86,14 @@ button,
 select,
 input[type="text"],
 input[type="search"] {
-  min-height: 30px;
+  min-height: 32px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--surface-solid);
   color: var(--text);
   font: inherit;
   outline: none;
+  box-shadow: var(--control-shadow);
 }
 
 button {
@@ -135,15 +140,26 @@ input:focus-visible,
   box-shadow: 0 0 0 3px var(--focus);
 }
 
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .app {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  max-height: min(640px, 100vh);
+  min-height: 460px;
+  align-content: start;
+  overflow-y: auto;
+  padding: 14px;
 }
 
 .header {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
@@ -169,13 +185,13 @@ p {
 }
 
 h1 {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0;
 }
 
 h2 {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -190,7 +206,7 @@ h2 {
 .actions {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .toolbar {
@@ -215,6 +231,11 @@ h2 {
   background: var(--accent-hover);
 }
 
+button:active,
+.popup-menu summary:active {
+  transform: translateY(1px);
+}
+
 .danger {
   color: var(--danger);
 }
@@ -236,43 +257,47 @@ h2 {
 }
 
 .icon-button {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
   padding: 0;
-  border-radius: 9px;
+  border-radius: 12px;
+  background: var(--surface-solid);
+  box-shadow: var(--control-shadow), 0 8px 18px rgba(0, 0, 0, 0.06);
 }
 
 .icon-button .button-icon {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .panel,
 .notice,
 .binding {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
 }
 
 .panel {
   display: grid;
-  gap: 9px;
-  padding: 10px;
+  gap: 10px;
+  padding: 12px;
   box-shadow: var(--shadow);
 }
 
 .profile-panel {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 7px;
+  gap: 8px;
   align-items: end;
 }
 
 .profile-actions {
   grid-column: 1 / -1;
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
 
 .profile-actions {
@@ -282,8 +307,8 @@ h2 {
 .profile-actions button,
 .binding-actions button {
   gap: 4px;
-  min-height: 28px;
-  padding: 3px 6px;
+  min-height: 30px;
+  padding: 4px 8px;
   font-size: 12px;
 }
 
@@ -305,7 +330,7 @@ h2 {
 }
 
 .popup-menu summary {
-  min-height: 28px;
+  min-height: 32px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-solid);
@@ -315,7 +340,7 @@ h2 {
   align-items: center;
   gap: 6px;
   list-style: none;
-  padding: 3px 8px;
+  padding: 4px 10px;
   user-select: none;
 }
 
@@ -349,7 +374,7 @@ h2 {
   right: 0;
   z-index: 5;
   display: grid;
-  gap: 5px;
+  gap: 4px;
   min-width: 150px;
   margin-top: 6px;
   padding: 6px;
@@ -357,6 +382,30 @@ h2 {
   border-radius: 8px;
   background: var(--surface-solid);
   box-shadow: var(--shadow);
+}
+
+.menu-popover button {
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.menu-popover button:hover {
+  background: var(--surface-hover);
+}
+
+.menu-popover .danger {
+  color: var(--text);
+}
+
+.menu-popover .danger .button-icon {
+  color: var(--danger);
+}
+
+.menu-popover .danger:hover,
+.menu-popover .danger:focus-visible {
+  color: var(--danger);
 }
 
 .options-actions {
@@ -369,26 +418,26 @@ h2 {
 
 .backup-actions button {
   justify-content: flex-start;
-  min-height: 28px;
-  padding: 3px 8px;
+  min-height: 30px;
+  padding: 4px 8px;
   font-size: 12px;
 }
 
 .menu-row {
-  min-height: 28px;
-  padding: 3px 6px;
+  min-height: 30px;
+  padding: 4px 8px;
   border-radius: 7px;
 }
 
 .menu-row:hover {
-  background: var(--surface-muted);
+  background: var(--surface-hover);
 }
 
 .count {
-  min-width: 26px;
-  min-height: 30px;
-  padding: 5px 7px;
-  border-radius: 8px;
+  min-width: 28px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 9px;
   background: var(--surface-muted);
   color: var(--text-muted);
   font-size: 12px;
@@ -402,7 +451,7 @@ h2 {
 }
 
 .notice {
-  padding: 8px 10px;
+  padding: 9px 11px;
   background: var(--warning-bg);
   color: var(--warning-text);
 }
@@ -414,7 +463,7 @@ h2 {
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .target-panel {
@@ -453,23 +502,23 @@ h2 {
 }
 
 .conflict {
-  padding: 8px;
-  border-radius: 8px;
+  padding: 9px;
+  border-radius: 9px;
   background: var(--error-bg);
   color: var(--error-text);
 }
 
 .bindings {
   display: grid;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 9px;
+  margin-top: 9px;
 }
 
 .list-header {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .list-header input {
@@ -480,12 +529,20 @@ h2 {
 
 .binding {
   display: grid;
-  gap: 8px;
-  padding: 9px;
+  gap: 10px;
+  padding: 11px;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.binding:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-solid);
+  box-shadow: var(--control-shadow);
 }
 
 .binding-main {
   display: flex;
+  align-items: start;
   justify-content: space-between;
   gap: 8px;
 }
@@ -504,24 +561,57 @@ h2 {
 
 .combo {
   align-self: start;
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--combo-bg);
   color: var(--combo-text);
-  padding: 2px 7px;
+  padding: 3px 8px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
+  box-shadow: var(--control-shadow);
   white-space: nowrap;
 }
 
 .binding-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.binding-edit {
+  min-width: 78px;
+}
+
+.more-menu {
+  margin-left: auto;
+}
+
+.more-menu summary {
+  width: 30px;
+  min-width: 30px;
+  justify-content: center;
+  padding: 0;
+}
+
+.more-menu summary::after {
+  display: none;
+}
+
+.binding-menu-actions {
+  min-width: 144px;
+}
+
+.binding-menu-actions button {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .empty {
-  padding: 13px;
+  padding: 16px;
   border: 1px dashed var(--border-strong);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-muted);
   text-align: center;
 }
