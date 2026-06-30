@@ -46,7 +46,9 @@ are happier for it.
 
 ## Demo
 
-https://github.com/user-attachments/assets/37064c3c-ff66-45d0-947f-75082c4da4c9
+
+https://github.com/user-attachments/assets/56ea3663-52f2-4601-8f66-dc60df10f5cc
+
 
 ## What it does
 
