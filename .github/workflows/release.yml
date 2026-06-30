@@ -76,4 +76,4 @@ jobs:
             --repo "${{ github.repository }}" \
             --verify-tag \
             --title "Firebinds ${version}" \
-            --notes "Automated Firefox and Chrome extension packages built from commit ${{ github.sha }}."
+            --notes-file CHANGELOG.md
