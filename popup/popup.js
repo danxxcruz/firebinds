@@ -52,7 +52,10 @@
   };
 
   let pageState = null;
-  let form = null;
+  let activeEditId = null;
+  let activeFormContext = null;
+  let savedFlashId = null;
+  let savedFlashTimer = 0;
   let view = "main";
   let viewTransitionTimer = 0;
 
@@ -64,9 +67,58 @@
     Enable: "power",
     Delete: "trash"
   };
+  const IMPORT_DEBUG_KEY = "firebinds.importDebug";
 
   function send(message) {
     return browser.runtime.sendMessage(message);
+  }
+
+  function preventBrowserZoom(event) {
+    if (!event.ctrlKey && !event.metaKey) return;
+    if (event.type === "wheel") {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "+" || event.key === "-" || event.key === "=" || event.key === "0") {
+      event.preventDefault();
+    }
+  }
+
+  async function resetPageZoom() {
+    if (!browser.tabs || !browser.tabs.getCurrent || !browser.tabs.setZoom) return;
+    try {
+      const tab = await browser.tabs.getCurrent();
+      if (tab && tab.id !== undefined) await browser.tabs.setZoom(tab.id, 1);
+    } catch (_error) {
+      // Zoom reset is best-effort; the popup should still load if the browser denies it.
+    }
+  }
+
+  async function isFirefox() {
+    if (!browser.runtime.getBrowserInfo) return false;
+    try {
+      const info = await browser.runtime.getBrowserInfo();
+      return /firefox/i.test(info.name || "");
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async function appendImportDebug(stage, detail = {}) {
+    const entry = {
+      stage,
+      at: new Date().toISOString(),
+      page: "popup",
+      visibility: document.visibilityState,
+      detail
+    };
+    try {
+      const result = await browser.storage.local.get(IMPORT_DEBUG_KEY);
+      const entries = Array.isArray(result[IMPORT_DEBUG_KEY]) ? result[IMPORT_DEBUG_KEY] : [];
+      await browser.storage.local.set({ [IMPORT_DEBUG_KEY]: [...entries, entry].slice(-100) });
+    } catch (error) {
+      console.info("[Firebinds import debug]", entry, error);
+    }
   }
 
   function iconNode(name) {
@@ -230,11 +282,25 @@
     for (const menu of popupMenus()) {
       if (menu === exceptMenu || !menu.open) continue;
       menu.open = false;
+      menu.classList.remove("menu-flip");
       if (restoreFocus) {
         const summary = menu.querySelector("summary");
         if (summary) summary.focus();
       }
     }
+  }
+
+  function positionPopupMenu(menu) {
+    if (!menu || !menu.open) return;
+    const summary = menu.querySelector("summary");
+    const popover = menu.querySelector(".menu-popover");
+    if (!summary || !popover) return;
+
+    menu.classList.remove("menu-flip");
+    const triggerRect = summary.getBoundingClientRect();
+    const popoverHeight = popover.getBoundingClientRect().height;
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    if (popoverHeight > spaceBelow) menu.classList.add("menu-flip");
   }
 
   function pageLabel(url) {
@@ -293,33 +359,216 @@
     return target && target.mode ? target.mode : "picker";
   }
 
-  function syncFormUi() {
-    if (!form) return;
-    const mode = els.targetModeSelect.value;
+  function formTargetLabel(target) {
+    return target ? bindingTargetLabel(target) : "Choose an element to bind to.";
+  }
+
+  function formModelFromBinding(binding, target) {
+    return {
+      id: binding.id,
+      target: target || binding.target,
+      targetMode: targetModeFor(target || binding.target),
+      scopeType: binding.scopeType,
+      keyCombo: binding.keyCombo,
+      allowInEditable: binding.allowInEditable
+    };
+  }
+
+  const topFormContext = {
+    kind: "top",
+    model: null,
+    nodes: {
+      panel: els.formPanel,
+      title: els.formTitle,
+      targetModeSelect: els.targetModeSelect,
+      pickerTargetPanel: els.pickerTargetPanel,
+      pickTargetButton: els.pickTargetButton,
+      textTargetPanel: els.textTargetPanel,
+      textTargetInput: els.textTargetInput,
+      targetLabel: els.targetLabel,
+      scopeSelect: els.scopeSelect,
+      keyCapture: els.keyCapture,
+      editableToggle: els.editableToggle,
+      conflictPanel: els.conflictPanel,
+      conflictText: els.conflictText,
+      replaceConflictToggle: els.replaceConflictToggle,
+      saveButton: els.saveButton,
+      testTargetButton: els.testTargetButton,
+      cancelButton: els.cancelButton
+    }
+  };
+
+  function inlineFormMarkup() {
+    return `
+      <h2 data-role="form-title">Edit shortcut</h2>
+
+      <label class="field">
+        <span>Target method</span>
+        <select data-role="target-mode">
+          <option value="picker">Pick element</option>
+          <option value="text">Text</option>
+          <option value="textPattern">Text pattern</option>
+        </select>
+      </label>
+
+      <div class="target-panel" data-role="picker-target-panel">
+        <p class="target" data-role="target-label">Choose an element to bind to.</p>
+        <button data-role="pick-target" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Pick element</span></button>
+      </div>
+
+      <label class="field" data-role="text-target-panel" hidden>
+        <span>Target text</span>
+        <input data-role="text-target" type="text" placeholder="Add New*">
+      </label>
+
+      <label class="field">
+        <span>Scope</span>
+        <select data-role="scope">
+          <option value="page">This page</option>
+          <option value="site">This site</option>
+          <option value="global">Global</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Shortcut</span>
+        <button class="capture" data-role="key-capture" type="button">Press keys</button>
+      </label>
+
+      <label class="check">
+        <input data-role="editable" type="checkbox">
+        <span>Allow while typing in fields</span>
+      </label>
+
+      <div class="conflict" data-role="conflict-panel" hidden>
+        <p data-role="conflict-text"></p>
+        <label class="check">
+          <input data-role="replace-conflict" type="checkbox">
+          <span>Replace the existing shortcut</span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button data-role="test-target" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Test target</span></button>
+        <button class="primary" data-role="save" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-check"></use></svg><span>Save</span></button>
+        <button data-role="cancel" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-x"></use></svg><span>Cancel</span></button>
+      </div>
+    `;
+  }
+
+  function inlineFormNodes(panel) {
+    return {
+      panel,
+      title: panel.querySelector("[data-role='form-title']"),
+      targetModeSelect: panel.querySelector("[data-role='target-mode']"),
+      pickerTargetPanel: panel.querySelector("[data-role='picker-target-panel']"),
+      pickTargetButton: panel.querySelector("[data-role='pick-target']"),
+      textTargetPanel: panel.querySelector("[data-role='text-target-panel']"),
+      textTargetInput: panel.querySelector("[data-role='text-target']"),
+      targetLabel: panel.querySelector("[data-role='target-label']"),
+      scopeSelect: panel.querySelector("[data-role='scope']"),
+      keyCapture: panel.querySelector("[data-role='key-capture']"),
+      editableToggle: panel.querySelector("[data-role='editable']"),
+      conflictPanel: panel.querySelector("[data-role='conflict-panel']"),
+      conflictText: panel.querySelector("[data-role='conflict-text']"),
+      replaceConflictToggle: panel.querySelector("[data-role='replace-conflict']"),
+      saveButton: panel.querySelector("[data-role='save']"),
+      testTargetButton: panel.querySelector("[data-role='test-target']"),
+      cancelButton: panel.querySelector("[data-role='cancel']")
+    };
+  }
+
+  function createInlineFormContext(panel) {
+    panel.innerHTML = inlineFormMarkup();
+    const context = {
+      kind: "inline",
+      model: null,
+      nodes: inlineFormNodes(panel)
+    };
+    wireFormContext(context);
+    return context;
+  }
+
+  function hideFormContext(context) {
+    if (!context || !context.nodes || !context.nodes.panel) return;
+    context.model = null;
+    context.nodes.panel.hidden = true;
+    context.nodes.panel.classList.remove("is-open");
+    context.nodes.keyCapture.classList.remove("listening");
+    context.nodes.conflictPanel.hidden = true;
+    context.nodes.replaceConflictToggle.checked = false;
+  }
+
+  function closeActiveForm() {
+    hideFormContext(activeFormContext);
+    hideFormContext(topFormContext);
+    activeEditId = null;
+    activeFormContext = null;
+  }
+
+  function hideTopForm() {
+    hideFormContext(topFormContext);
+    if (activeFormContext === topFormContext) activeFormContext = null;
+  }
+
+  function closeInlineEdit(render = false) {
+    if (activeFormContext && activeFormContext.kind === "inline") hideFormContext(activeFormContext);
+    activeEditId = null;
+    if (activeFormContext && activeFormContext.kind === "inline") activeFormContext = null;
+    if (render) renderBindings();
+  }
+
+  function setFormContext(context, nextForm, options = {}) {
+    context.model = nextForm;
+    context.nodes.panel.hidden = !nextForm;
+    if (context.kind === "inline") context.nodes.panel.classList.remove("is-open");
+    context.nodes.conflictPanel.hidden = true;
+    context.nodes.replaceConflictToggle.checked = false;
+    context.nodes.keyCapture.classList.remove("listening");
+
+    if (!nextForm) {
+      if (activeFormContext === context) activeFormContext = null;
+      return;
+    }
+
+    activeFormContext = context;
+    const mode = targetModeFor(nextForm.target);
+    context.nodes.title.textContent = nextForm.id ? "Edit shortcut" : "New shortcut";
+    context.nodes.targetModeSelect.value = nextForm.targetMode || mode;
+    context.nodes.textTargetInput.value = nextForm.target && nextForm.target.textQuery ? nextForm.target.textQuery : "";
+    context.nodes.scopeSelect.value = nextForm.scopeType || "page";
+    context.nodes.keyCapture.textContent = nextForm.keyCombo || "Press keys";
+    context.nodes.editableToggle.checked = Boolean(nextForm.allowInEditable);
+    syncFormUi(context);
+    if (context.kind === "inline") {
+      requestAnimationFrame(() => {
+        if (activeFormContext === context && context.model === nextForm) {
+          context.nodes.panel.classList.add("is-open");
+        }
+      });
+    }
+    if (!options.keepNotice) showNotice("", "");
+  }
+
+  function syncFormUi(context = activeFormContext) {
+    if (!context || !context.model) return;
+    const mode = context.nodes.targetModeSelect.value;
     const isPicker = mode === "picker";
-    els.pickerTargetPanel.hidden = !isPicker;
-    els.textTargetPanel.hidden = isPicker;
-    setButtonLabel(els.pickTargetButton, form.id ? "Reselect element" : "Pick element");
-    els.targetLabel.textContent = bindingTargetLabel(form.target);
-    els.testTargetButton.disabled = !targetFromForm(false);
+    context.nodes.pickerTargetPanel.hidden = !isPicker;
+    context.nodes.textTargetPanel.hidden = isPicker;
+    setButtonLabel(context.nodes.pickTargetButton, context.model.id ? "Reselect element" : "Pick element");
+    context.nodes.targetLabel.textContent = formTargetLabel(context.model.target);
+    context.nodes.testTargetButton.disabled = !targetFromForm(false, context);
   }
 
   function setForm(nextForm) {
-    form = nextForm;
-    els.formPanel.hidden = !form;
-    els.conflictPanel.hidden = true;
-    els.replaceConflictToggle.checked = false;
-
-    if (!form) return;
-    const mode = targetModeFor(form.target);
-    els.formTitle.textContent = form.id ? "Edit shortcut" : "New shortcut";
-    els.targetModeSelect.value = form.targetMode || mode;
-    els.textTargetInput.value = form.target && form.target.textQuery ? form.target.textQuery : "";
-    els.scopeSelect.value = form.scopeType || "page";
-    els.keyCapture.textContent = form.keyCombo || "Press keys";
-    els.editableToggle.checked = Boolean(form.allowInEditable);
-    syncFormUi();
-    showNotice("", "");
+    if (!nextForm) {
+      closeActiveForm();
+      return;
+    }
+    closeInlineEdit(activeFormContext && activeFormContext.kind === "inline");
+    activeEditId = null;
+    setFormContext(topFormContext, nextForm);
   }
 
   function newForm() {
@@ -357,7 +606,16 @@
     ].join(" ").toLowerCase();
   }
 
+  function statusDotClass(binding) {
+    return statusText(binding) === "Ready" ? "is-ready" : "is-attention";
+  }
+
   function renderBindings() {
+    const activeDraft = activeFormContext && activeFormContext.kind === "inline" && activeFormContext.model
+      ? activeFormContext.model
+      : null;
+    let renderedActiveEdit = false;
+
     els.bindingsList.textContent = "";
     const query = els.searchInput.value.trim().toLowerCase();
     const bindings = (pageState && pageState.bindings ? pageState.bindings : [])
@@ -368,19 +626,28 @@
       empty.className = "empty";
       empty.textContent = query ? "No matching shortcuts." : "No shortcuts for this page yet.";
       els.bindingsList.appendChild(empty);
+      if (activeFormContext && activeFormContext.kind === "inline") activeFormContext = null;
+      activeEditId = null;
       return;
     }
 
     for (const binding of bindings) {
       const item = document.createElement("article");
       item.className = "binding";
+      item.classList.toggle("is-disabled", !binding.enabled);
+      item.classList.toggle("is-editing", binding.id === activeEditId);
       item.innerHTML = `
         <div class="binding-main">
+          <label class="binding-toggle" title="${binding.enabled ? "Disable shortcut" : "Enable shortcut"}">
+            <input class="binding-enabled" type="checkbox" aria-label="${binding.enabled ? "Disable shortcut" : "Enable shortcut"}">
+            <span aria-hidden="true"></span>
+          </label>
           <div class="binding-label">
             <strong></strong>
             <span class="muted"></span>
           </div>
           <span class="combo"></span>
+          <span class="binding-status-dot" aria-hidden="true"></span>
         </div>
         <div class="binding-actions">
           <button class="binding-edit" type="button"></button>
@@ -394,20 +661,52 @@
       `;
 
       item.querySelector("strong").textContent = bindingTargetLabel(binding.target);
-      item.querySelector(".muted").textContent = `${scopeLabel(binding)} · ${targetModeFor(binding.target)} · ${statusText(binding)}`;
+      item.querySelector(".muted").textContent = `${scopeLabel(binding)} · ${targetModeFor(binding.target)}`;
       item.querySelector(".combo").textContent = binding.keyCombo || "unset";
+      const statusDot = item.querySelector(".binding-status-dot");
+      statusDot.classList.add(statusDotClass(binding));
+      statusDot.title = statusText(binding);
+      const enabledToggle = item.querySelector(".binding-enabled");
       const editButton = item.querySelector(".binding-edit");
       const menuActions = item.querySelector(".binding-menu-actions");
+      const editForm = document.createElement("div");
+      editForm.className = "binding-edit-form";
+      editForm.dataset.bindingId = binding.id;
+      editForm.hidden = true;
 
-      setButtonContent(editButton, "Edit", BUTTON_ICONS.Edit);
-      editButton.addEventListener("click", () => editBinding(binding));
+      enabledToggle.checked = Boolean(binding.enabled);
+      enabledToggle.addEventListener("change", () => toggleBinding(binding));
+      if (binding.id === savedFlashId) {
+        setButtonContent(editButton, "Saved", "check");
+        editButton.disabled = true;
+      } else {
+        setButtonContent(editButton, "Edit", BUTTON_ICONS.Edit);
+        editButton.addEventListener("click", () => {
+          if (binding.id === activeEditId) {
+            cancelForm(activeFormContext);
+            return;
+          }
+          editBinding(binding);
+        });
+      }
       menuActions.append(
         button("Test", () => testTarget(binding.target)),
         button("Duplicate", () => duplicateBinding(binding)),
-        button(binding.enabled ? "Disable" : "Enable", () => toggleBinding(binding)),
         button("Delete", () => deleteBinding(binding), { danger: true })
       );
-      els.bindingsList.appendChild(item);
+      els.bindingsList.append(item, editForm);
+
+      if (binding.id === activeEditId) {
+        const context = createInlineFormContext(editForm);
+        const draft = activeDraft && activeDraft.id === binding.id ? activeDraft : formModelFromBinding(binding);
+        setFormContext(context, draft, { keepNotice: true });
+        renderedActiveEdit = true;
+      }
+    }
+
+    if (activeEditId && !renderedActiveEdit) {
+      activeEditId = null;
+      if (activeFormContext && activeFormContext.kind === "inline") activeFormContext = null;
     }
   }
 
@@ -426,7 +725,9 @@
     pageState = state;
     if (!state.ok) {
       setForm(null);
-      els.pageLabel.textContent = state.reason || "Unsupported page";
+      const label = state.reason || "Unsupported page";
+      els.pageLabel.textContent = label;
+      els.pageLabel.title = label;
       els.controls.hidden = true;
       els.profilePanel.hidden = true;
       syncSettingsUi(state);
@@ -438,20 +739,26 @@
     els.controls.hidden = false;
     els.profilePanel.hidden = false;
     els.pageLabel.textContent = pageLabel(state.page.url);
+    els.pageLabel.title = state.page.url || els.pageLabel.textContent;
     syncSettingsUi(state);
     renderProfiles();
     renderBindings();
 
     if (state.pendingPick && state.pendingPick.target) {
       const existing = state.bindings.find((binding) => binding.id === state.pendingPick.bindingId);
-      setForm({
+      const pickedForm = {
         id: existing ? existing.id : "",
         target: state.pendingPick.target,
         targetMode: "picker",
         scopeType: existing ? existing.scopeType : "page",
         keyCombo: existing ? existing.keyCombo : "",
         allowInEditable: existing ? existing.allowInEditable : false
-      });
+      };
+      if (existing) {
+        editBinding(existing, pickedForm, { keepNotice: true });
+      } else {
+        setForm(pickedForm);
+      }
       showNotice("Element selected. Finish and save the shortcut here.", "");
     }
     if (view === "settings") showView("settings", false);
@@ -466,15 +773,21 @@
     window.close();
   }
 
-  function editBinding(binding) {
-    setForm({
-      id: binding.id,
-      target: binding.target,
-      targetMode: targetModeFor(binding.target),
-      scopeType: binding.scopeType,
-      keyCombo: binding.keyCombo,
-      allowInEditable: binding.allowInEditable
-    });
+  function editBinding(binding, draft = null, options = {}) {
+    hideTopForm();
+    activeEditId = binding.id;
+    activeFormContext = {
+      kind: "inline",
+      model: draft || formModelFromBinding(binding),
+      nodes: null
+    };
+    renderBindings();
+    if (activeFormContext && activeFormContext.kind === "inline" && activeFormContext.nodes) {
+      if (options.scroll !== false) {
+        activeFormContext.nodes.panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+    if (!options.keepNotice) showNotice("", "");
   }
 
   async function duplicateBinding(binding) {
@@ -511,27 +824,28 @@
     await loadState();
   }
 
-  function capturedCombo(event) {
+  function capturedCombo(event, context = activeFormContext) {
+    if (!context || !context.model) return;
     event.preventDefault();
     event.stopPropagation();
     const combo = KeyCombo.eventToCombo(event);
     const validation = KeyCombo.validateCombo(combo);
-    form.keyCombo = combo;
-    els.keyCapture.textContent = combo || "Press keys";
+    context.model.keyCombo = combo;
+    context.nodes.keyCapture.textContent = combo || "Press keys";
     showNotice(validation.ok ? "" : validation.reason, validation.ok ? "" : "error");
   }
 
-  function targetFromForm(showErrors) {
-    if (!form) return null;
-    const mode = els.targetModeSelect.value;
+  function targetFromForm(showErrors, context = activeFormContext) {
+    if (!context || !context.model) return null;
+    const mode = context.nodes.targetModeSelect.value;
     if (mode === "picker") {
-      if (!form.target) {
+      if (!context.model.target) {
         if (showErrors) showNotice("Pick an element first.", "error");
         return null;
       }
-      return { ...form.target, mode: "picker" };
+      return { ...context.model.target, mode: "picker" };
     }
-    const query = els.textTargetInput.value.trim();
+    const query = context.nodes.textTargetInput.value.trim();
     if (!query) {
       if (showErrors) showNotice("Enter target text first.", "error");
       return null;
@@ -539,8 +853,8 @@
     return Targeting.createTextDescriptor(mode, query);
   }
 
-  async function testTarget(target) {
-    const targetToTest = target || targetFromForm(true);
+  async function testTarget(target, context = activeFormContext) {
+    const targetToTest = target || targetFromForm(true, context);
     if (!targetToTest) return;
     const result = await send({ type: M.TEST_TARGET, target: targetToTest });
     if (!result.ok) {
@@ -555,39 +869,51 @@
     showNotice(copy, result.status === "ready" ? "" : "error");
   }
 
-  async function saveForm() {
-    const target = targetFromForm(true);
+  function flashSavedBinding(bindingId) {
+    window.clearTimeout(savedFlashTimer);
+    savedFlashId = bindingId;
+    renderBindings();
+    savedFlashTimer = window.setTimeout(() => {
+      if (savedFlashId !== bindingId) return;
+      savedFlashId = null;
+      renderBindings();
+    }, 1500);
+  }
+
+  async function saveForm(context = activeFormContext) {
+    if (!context || !context.model) return;
+    const target = targetFromForm(true, context);
     if (!target) return;
 
-    const validation = KeyCombo.validateCombo(form.keyCombo);
+    const validation = KeyCombo.validateCombo(context.model.keyCombo);
     if (!validation.ok) {
       showNotice(validation.reason, "error");
       return;
     }
 
-    const scopeType = els.scopeSelect.value;
+    const scopeType = context.nodes.scopeSelect.value;
     const payload = {
-      id: form.id || undefined,
+      id: context.model.id || undefined,
       profileId: activeProfileId(),
       scopeType,
       scopeValue: scopeValue(scopeType),
-      keyCombo: form.keyCombo,
+      keyCombo: context.model.keyCombo,
       target,
       enabled: true,
       showIndicator: true,
-      allowInEditable: els.editableToggle.checked,
+      allowInEditable: context.nodes.editableToggle.checked,
       status: "ready",
-      replaceConflict: els.replaceConflictToggle.checked
+      replaceConflict: context.nodes.replaceConflictToggle.checked
     };
 
-    const message = form.id
-      ? { type: M.UPDATE_BINDING, id: form.id, patch: payload }
+    const message = context.model.id
+      ? { type: M.UPDATE_BINDING, id: context.model.id, patch: payload }
       : { type: M.SAVE_BINDING, binding: payload };
     const result = await send(message);
 
     if (!result.ok && result.conflict) {
-      els.conflictPanel.hidden = false;
-      els.conflictText.textContent = result.reason;
+      context.nodes.conflictPanel.hidden = false;
+      context.nodes.conflictText.textContent = result.reason;
       showNotice("Resolve the duplicate shortcut before saving.", "error");
       return;
     }
@@ -596,15 +922,54 @@
       return;
     }
 
+    const wasInlineEdit = context.kind === "inline";
+    const savedId = result.binding && result.binding.id ? result.binding.id : context.model.id;
     await send({ type: M.CLEAR_PENDING_PICK });
     setForm(null);
     await loadState();
+    if (wasInlineEdit && savedId) flashSavedBinding(savedId);
   }
 
-  async function cancelForm() {
+  async function cancelForm(context = activeFormContext) {
+    const wasInlineEdit = context && context.kind === "inline";
     await send({ type: M.CLEAR_PENDING_PICK });
     setForm(null);
+    if (wasInlineEdit) renderBindings();
     showNotice("", "");
+  }
+
+  function wireFormContext(context) {
+    const { nodes } = context;
+    nodes.pickTargetButton.addEventListener("click", () => {
+      if (!context.model) return;
+      activeFormContext = context;
+      startPicker(context.model.id);
+    });
+    nodes.targetModeSelect.addEventListener("change", () => {
+      if (!context.model) return;
+      activeFormContext = context;
+      const nextMode = nodes.targetModeSelect.value;
+      context.model.targetMode = nextMode;
+      if (!context.model.target || targetModeFor(context.model.target) !== nextMode) context.model.target = null;
+      syncFormUi(context);
+    });
+    nodes.textTargetInput.addEventListener("input", () => syncFormUi(context));
+    nodes.keyCapture.addEventListener("click", () => {
+      if (!context.model) return;
+      activeFormContext = context;
+      nodes.keyCapture.classList.add("listening");
+      nodes.keyCapture.textContent = "Press keys...";
+      nodes.keyCapture.focus();
+    });
+    nodes.keyCapture.addEventListener("keydown", (event) => {
+      if (!context.model) return;
+      activeFormContext = context;
+      nodes.keyCapture.classList.remove("listening");
+      capturedCombo(event, context);
+    });
+    nodes.saveButton.addEventListener("click", () => saveForm(context));
+    nodes.cancelButton.addEventListener("click", () => cancelForm(context));
+    nodes.testTargetButton.addEventListener("click", () => testTarget(null, context));
   }
 
   async function createProfile() {
@@ -663,12 +1028,24 @@
     showNotice("Backup exported.", "");
   }
 
-  async function importBackupFile(file) {
+  async function importBackupFile(file, sourcePage = "popup") {
+    await appendImportDebug("file-input-change", { hasFile: Boolean(file), sourcePage });
     if (!file) return;
     try {
-      const backup = JSON.parse(await file.text());
+      let backup;
+      try {
+        await appendImportDebug("file-read-start", { name: file.name, size: file.size, sourcePage });
+        backup = JSON.parse(await file.text());
+        await appendImportDebug("json-parse-ok", { sourcePage });
+      } catch (_error) {
+        showNotice("Backup file is not valid JSON.", "error");
+        return;
+      }
+      await appendImportDebug("confirm-start", { sourcePage });
       if (!confirm("Importing this backup will replace all current Firebinds profiles and shortcuts.")) return;
+      await appendImportDebug("message-send", { sourcePage });
       const result = await send({ type: M.IMPORT_BACKUP, backup });
+      await appendImportDebug("message-result", { ok: Boolean(result && result.ok), reason: result && result.reason, sourcePage });
       if (!result.ok) {
         showNotice(result.reason || "Could not import backup.", "error");
         return;
@@ -677,12 +1054,31 @@
       await loadState();
       showNotice("Backup imported.", "");
     } catch (error) {
-      showNotice(error.message || "Backup file is not valid JSON.", "error");
+      showNotice(error.message || "Could not import backup.", "error");
     } finally {
       els.importFileInput.value = "";
     }
   }
 
+  async function openImportPage() {
+    try {
+      await send({ type: M.CLEAR_IMPORT_DEBUG });
+      await appendImportDebug("import-click");
+      const url = browser.runtime.getURL("popup/import.html");
+      if (await isFirefox()) {
+        await browser.windows.create({ url, type: "popup", width: 420, height: 560 });
+        window.close();
+      } else {
+        els.importFileInput.value = "";
+        els.importFileInput.focus();
+        els.importFileInput.click();
+      }
+    } catch (error) {
+      showNotice(error.message || "Could not open import page.", "error");
+    }
+  }
+
+  wireFormContext(topFormContext);
   els.refreshButton.addEventListener("click", loadState);
   els.settingsButton.addEventListener("click", () => showView("settings"));
   els.settingsBackButton.addEventListener("click", () => showView("main"));
@@ -697,7 +1093,13 @@
   els.deleteProfileButton.addEventListener("click", deleteProfile);
   document.addEventListener("toggle", (event) => {
     const menu = event.target && event.target.closest ? event.target.closest(".popup-menu") : null;
-    if (menu && menu.open) closePopupMenus(menu);
+    if (!menu) return;
+    if (menu.open) {
+      closePopupMenus(menu);
+      requestAnimationFrame(() => positionPopupMenu(menu));
+    } else {
+      menu.classList.remove("menu-flip");
+    }
   }, true);
   document.addEventListener("click", (event) => {
     const menu = event.target && event.target.closest ? event.target.closest(".popup-menu") : null;
@@ -712,21 +1114,12 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePopupMenus(null, true);
   });
+  document.addEventListener("wheel", preventBrowserZoom, { passive: false });
+  document.addEventListener("keydown", preventBrowserZoom);
   els.exportButton.addEventListener("click", exportBackup);
-  els.importButton.addEventListener("click", () => {
-    els.importFileInput.click();
-  });
+  els.importButton.addEventListener("click", openImportPage);
   els.importFileInput.addEventListener("change", () => importBackupFile(els.importFileInput.files[0]));
   els.addButton.addEventListener("click", newForm);
-  els.pickTargetButton.addEventListener("click", () => startPicker(form && form.id));
-  els.targetModeSelect.addEventListener("change", () => {
-    if (!form) return;
-    const nextMode = els.targetModeSelect.value;
-    form.targetMode = nextMode;
-    if (!form.target || targetModeFor(form.target) !== nextMode) form.target = null;
-    syncFormUi();
-  });
-  els.textTargetInput.addEventListener("input", syncFormUi);
   els.searchInput.addEventListener("input", renderBindings);
   els.indicatorsToggle.addEventListener("change", async () => {
     if (!pageState || !pageState.ok) return;
@@ -764,20 +1157,17 @@
     }
     await loadState();
   });
-  els.keyCapture.addEventListener("click", () => {
-    els.keyCapture.classList.add("listening");
-    els.keyCapture.textContent = "Press keys...";
-    els.keyCapture.focus();
+  window.addEventListener("pagehide", (event) => {
+    appendImportDebug("pagehide", { persisted: Boolean(event.persisted) });
   });
-  els.keyCapture.addEventListener("keydown", (event) => {
-    if (!form) return;
-    els.keyCapture.classList.remove("listening");
-    capturedCombo(event);
+  window.addEventListener("beforeunload", () => {
+    appendImportDebug("beforeunload");
   });
-  els.saveButton.addEventListener("click", saveForm);
-  els.cancelButton.addEventListener("click", cancelForm);
-  els.testTargetButton.addEventListener("click", () => testTarget());
+  document.addEventListener("visibilitychange", () => {
+    appendImportDebug("visibilitychange");
+  });
 
+  resetPageZoom().catch((_error) => {});
   loadState().catch((error) => {
     showNotice(error.message || "Could not load Firebinds.", "error");
   });

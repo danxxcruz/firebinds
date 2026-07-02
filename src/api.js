@@ -60,6 +60,7 @@
     },
     runtime: {
       getManifest: () => chromeApi.runtime.getManifest(),
+      getURL: (path) => chromeApi.runtime.getURL(path),
       onMessage: messageEvent(chromeApi.runtime.onMessage),
       sendMessage: maybePromisify(chromeApi.runtime, "sendMessage")
     },
@@ -74,8 +75,14 @@
       }
     },
     tabs: {
+      create: maybePromisify(chromeApi.tabs, "create"),
+      getCurrent: maybePromisify(chromeApi.tabs, "getCurrent"),
       query: maybePromisify(chromeApi.tabs, "query"),
+      setZoom: maybePromisify(chromeApi.tabs, "setZoom"),
       sendMessage: maybePromisify(chromeApi.tabs, "sendMessage")
+    },
+    windows: {
+      create: maybePromisify(chromeApi.windows, "create")
     }
   };
 })(globalThis);

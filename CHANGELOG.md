@@ -1,6 +1,12 @@
 # Changelog
 
-All notable changes to Firebinds are documented in this file.
+## [0.3.1] - 2026-07-02
+
+### Fixed
+- Fixed backup import on Firefox by moving the import flow to a dedicated window.
+
+### Improved
+- Improved popup UI and shortcut editing UX.
 
 ## [0.3.0] - 2026-06-29
 

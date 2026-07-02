@@ -1,6 +1,6 @@
 {
   "name": "firebinds",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "build:firefox": "node scripts/build.mjs build firefox",

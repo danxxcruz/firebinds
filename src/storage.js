@@ -48,6 +48,42 @@
     return value;
   }
 
+  function normalizedBackupProfiles(profiles) {
+    const timestamp = now();
+    if (!profiles.length) return [defaultProfile()];
+    return profiles.map((profile) => {
+      plainObject(profile, "profile");
+      if (typeof profile.id !== "string" || !profile.id) throw new Error("Backup profile is missing an id.");
+      if (typeof profile.name !== "string") throw new Error("Backup profile is missing a name.");
+      return {
+        ...profile,
+        createdAt: typeof profile.createdAt === "string" ? profile.createdAt : timestamp,
+        updatedAt: typeof profile.updatedAt === "string" ? profile.updatedAt : timestamp
+      };
+    });
+  }
+
+  function normalizedBackupActiveProfileId(activeProfileId, profiles) {
+    if (typeof activeProfileId === "string" && profiles.some((profile) => profile.id === activeProfileId)) {
+      return activeProfileId;
+    }
+    return profiles[0].id;
+  }
+
+  function normalizedBackupBindings(bindings, activeProfileId, profiles) {
+    const profileIds = new Set(profiles.map((profile) => profile.id));
+    return bindings.map((binding) => {
+      plainObject(binding, "binding");
+      if (typeof binding.id !== "string" || !binding.id) throw new Error("Backup binding is missing an id.");
+      const profileId = profileIds.has(binding.profileId) ? binding.profileId : activeProfileId;
+      return {
+        ...binding,
+        profileId,
+        scopeValue: binding.scopeType === "global" ? GLOBAL_SCOPE_VALUE : binding.scopeValue
+      };
+    });
+  }
+
   function normalizedIndicatorOpacity(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return DEFAULT_INDICATOR_OPACITY;
@@ -395,20 +431,10 @@
     if (data.app !== "Firebinds") throw new Error("Backup is not a Firebinds backup.");
     if (data.schemaVersion !== BACKUP_SCHEMA_VERSION) throw new Error("Backup version is not supported.");
 
-    const profiles = assertArray(data.profiles, "profiles");
-    const bindings = assertArray(data.bindings, "bindings");
+    const profiles = normalizedBackupProfiles(assertArray(data.profiles, "profiles"));
+    const activeProfileId = normalizedBackupActiveProfileId(data.activeProfileId, profiles);
+    const bindings = normalizedBackupBindings(assertArray(data.bindings, "bindings"), activeProfileId, profiles);
     const settings = data.settings === undefined ? { indicatorVisibility: {} } : plainObject(data.settings, "settings");
-    const activeProfileId = typeof data.activeProfileId === "string" ? data.activeProfileId : "";
-
-    for (const profile of profiles) {
-      plainObject(profile, "profile");
-      if (typeof profile.id !== "string" || !profile.id) throw new Error("Backup profile is missing an id.");
-      if (typeof profile.name !== "string") throw new Error("Backup profile is missing a name.");
-    }
-    for (const binding of bindings) {
-      plainObject(binding, "binding");
-      if (typeof binding.id !== "string" || !binding.id) throw new Error("Backup binding is missing an id.");
-    }
 
     await browser.storage.local.set({
       [BINDINGS_KEY]: bindings,

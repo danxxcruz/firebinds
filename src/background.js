@@ -3,6 +3,7 @@
   const Storage = global.Firebinds.Storage;
   const Targeting = global.Firebinds.Targeting;
   const KeyCombo = global.Firebinds.KeyCombo;
+  const IMPORT_DEBUG_KEY = "firebinds.importDebug";
 
   let pendingPick = null;
 
@@ -88,6 +89,21 @@
     } catch (_error) {
       // The tab may not have a content script yet; it will ask for state on load.
     }
+  }
+
+  async function applyStateToOpenTabs() {
+    const tabs = await browser.tabs.query({});
+    await Promise.all((tabs || []).map((tab) => applyState(tab.id, tab.url)));
+  }
+
+  async function getImportDebug() {
+    const result = await browser.storage.local.get(IMPORT_DEBUG_KEY);
+    return Array.isArray(result[IMPORT_DEBUG_KEY]) ? result[IMPORT_DEBUG_KEY] : [];
+  }
+
+  async function clearImportDebug() {
+    await browser.storage.local.set({ [IMPORT_DEBUG_KEY]: [] });
+    return [];
   }
 
   async function saveBinding(input) {
@@ -279,13 +295,16 @@
       case M.IMPORT_BACKUP: {
         try {
           const backup = await Storage.importBackup(message.backup);
-          const tab = await activeTab();
-          if (tab) await applyState(tab.id, tab.url);
+          await applyStateToOpenTabs();
           return { ok: true, backup };
         } catch (error) {
           return { ok: false, reason: error.message || "Could not import backup." };
         }
       }
+      case M.GET_IMPORT_DEBUG:
+        return { ok: true, entries: await getImportDebug() };
+      case M.CLEAR_IMPORT_DEBUG:
+        return { ok: true, entries: await clearImportDebug() };
       case M.TEST_TARGET: {
         const tab = await activeTab();
         if (!tab || !tab.url || !isAllowedUrl(tab.url)) {
