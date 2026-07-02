@@ -398,62 +398,112 @@
     }
   };
 
-  function inlineFormMarkup() {
-    return `
-      <h2 data-role="form-title">Edit shortcut</h2>
+  function roleElement(tagName, role, className) {
+    const node = document.createElement(tagName);
+    node.dataset.role = role;
+    if (className) node.className = className;
+    return node;
+  }
 
-      <label class="field">
-        <span>Target method</span>
-        <select data-role="target-mode">
-          <option value="picker">Pick element</option>
-          <option value="text">Text</option>
-          <option value="textPattern">Text pattern</option>
-        </select>
-      </label>
+  function labelText(text) {
+    const node = document.createElement("span");
+    node.textContent = text;
+    return node;
+  }
 
-      <div class="target-panel" data-role="picker-target-panel">
-        <p class="target" data-role="target-label">Choose an element to bind to.</p>
-        <button data-role="pick-target" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Pick element</span></button>
-      </div>
+  function optionNode(value, label) {
+    const node = document.createElement("option");
+    node.value = value;
+    node.textContent = label;
+    return node;
+  }
 
-      <label class="field" data-role="text-target-panel" hidden>
-        <span>Target text</span>
-        <input data-role="text-target" type="text" placeholder="Add New*">
-      </label>
+  function formSelect(role, options) {
+    const node = roleElement("select", role);
+    node.append(...options.map(([value, label]) => optionNode(value, label)));
+    return node;
+  }
 
-      <label class="field">
-        <span>Scope</span>
-        <select data-role="scope">
-          <option value="page">This page</option>
-          <option value="site">This site</option>
-          <option value="global">Global</option>
-        </select>
-      </label>
+  function fieldNode(label, control, role) {
+    const node = document.createElement("label");
+    node.className = "field";
+    if (role) node.dataset.role = role;
+    node.append(labelText(label), control);
+    return node;
+  }
 
-      <label class="field">
-        <span>Shortcut</span>
-        <button class="capture" data-role="key-capture" type="button">Press keys</button>
-      </label>
+  function roleButton(role, label, iconName, className) {
+    const node = roleElement("button", role, className);
+    node.type = "button";
+    setButtonContent(node, label, iconName);
+    return node;
+  }
 
-      <label class="check">
-        <input data-role="editable" type="checkbox">
-        <span>Allow while typing in fields</span>
-      </label>
+  function appendInlineForm(panel) {
+    panel.textContent = "";
 
-      <div class="conflict" data-role="conflict-panel" hidden>
-        <p data-role="conflict-text"></p>
-        <label class="check">
-          <input data-role="replace-conflict" type="checkbox">
-          <span>Replace the existing shortcut</span>
-        </label>
-      </div>
+    const title = roleElement("h2", "form-title");
+    title.textContent = "Edit shortcut";
 
-      <div class="actions">
-        <button data-role="test-target" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Test target</span></button>
-        <button class="primary" data-role="save" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-check"></use></svg><span>Save</span></button>
-        <button data-role="cancel" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-x"></use></svg><span>Cancel</span></button>
-      </div>
-    `;
+    const targetModeSelect = formSelect("target-mode", [
+      ["picker", "Pick element"],
+      ["text", "Text"],
+      ["textPattern", "Text pattern"]
+    ]);
+
+    const pickerTargetPanel = roleElement("div", "picker-target-panel", "target-panel");
+    const targetLabel = roleElement("p", "target-label", "target");
+    targetLabel.textContent = "Choose an element to bind to.";
+    pickerTargetPanel.append(targetLabel, roleButton("pick-target", "Pick element", "target"));
+
+    const textTargetInput = roleElement("input", "text-target");
+    textTargetInput.type = "text";
+    textTargetInput.placeholder = "Add New*";
+    const textTargetPanel = fieldNode("Target text", textTargetInput, "text-target-panel");
+    textTargetPanel.hidden = true;
+
+    const scopeSelect = formSelect("scope", [
+      ["page", "This page"],
+      ["site", "This site"],
+      ["global", "Global"]
+    ]);
+
+    const keyCapture = roleButton("key-capture", "Press keys", "", "capture");
+    const editableToggle = roleElement("input", "editable");
+    editableToggle.type = "checkbox";
+    const editableCheck = document.createElement("label");
+    editableCheck.className = "check";
+    editableCheck.append(editableToggle, labelText("Allow while typing in fields"));
+
+    const conflictPanel = roleElement("div", "conflict-panel", "conflict");
+    conflictPanel.hidden = true;
+    const conflictText = roleElement("p", "conflict-text");
+    const replaceConflictToggle = roleElement("input", "replace-conflict");
+    replaceConflictToggle.type = "checkbox";
+    const replaceConflictCheck = document.createElement("label");
+    replaceConflictCheck.className = "check";
+    replaceConflictCheck.append(replaceConflictToggle, labelText("Replace the existing shortcut"));
+    conflictPanel.append(conflictText, replaceConflictCheck);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    actions.append(
+      roleButton("test-target", "Test target", "target"),
+      roleButton("save", "Save", "check", "primary"),
+      roleButton("cancel", "Cancel", "x")
+    );
+
+    panel.append(
+      title,
+      fieldNode("Target method", targetModeSelect),
+      pickerTargetPanel,
+      textTargetPanel,
+      fieldNode("Scope", scopeSelect),
+      fieldNode("Shortcut", keyCapture),
+      editableCheck,
+      conflictPanel,
+      actions
+    );
   }
 
   function inlineFormNodes(panel) {
@@ -479,7 +529,7 @@
   }
 
   function createInlineFormContext(panel) {
-    panel.innerHTML = inlineFormMarkup();
+    appendInlineForm(panel);
     const context = {
       kind: "inline",
       model: null,
@@ -636,39 +686,58 @@
       item.className = "binding";
       item.classList.toggle("is-disabled", !binding.enabled);
       item.classList.toggle("is-editing", binding.id === activeEditId);
-      item.innerHTML = `
-        <div class="binding-main">
-          <label class="binding-toggle" title="${binding.enabled ? "Disable shortcut" : "Enable shortcut"}">
-            <input class="binding-enabled" type="checkbox" aria-label="${binding.enabled ? "Disable shortcut" : "Enable shortcut"}">
-            <span aria-hidden="true"></span>
-          </label>
-          <div class="binding-label">
-            <strong></strong>
-            <span class="muted"></span>
-          </div>
-          <span class="combo"></span>
-          <span class="binding-status-dot" aria-hidden="true"></span>
-        </div>
-        <div class="binding-actions">
-          <button class="binding-edit" type="button"></button>
-          <details class="popup-menu more-menu binding-menu">
-            <summary title="More actions" aria-label="More binding actions" aria-haspopup="menu">
-              <svg class="button-icon" aria-hidden="true"><use href="#icon-more"></use></svg>
-            </summary>
-            <div class="menu-popover binding-menu-actions"></div>
-          </details>
-        </div>
-      `;
+      const bindingMain = document.createElement("div");
+      bindingMain.className = "binding-main";
 
-      item.querySelector("strong").textContent = bindingTargetLabel(binding.target);
-      item.querySelector(".muted").textContent = `${scopeLabel(binding)} · ${targetModeFor(binding.target)}`;
-      item.querySelector(".combo").textContent = binding.keyCombo || "unset";
-      const statusDot = item.querySelector(".binding-status-dot");
+      const toggleLabel = document.createElement("label");
+      toggleLabel.className = "binding-toggle";
+      toggleLabel.title = binding.enabled ? "Disable shortcut" : "Enable shortcut";
+      const enabledToggle = document.createElement("input");
+      enabledToggle.className = "binding-enabled";
+      enabledToggle.type = "checkbox";
+      enabledToggle.setAttribute("aria-label", binding.enabled ? "Disable shortcut" : "Enable shortcut");
+      const toggleTrack = document.createElement("span");
+      toggleTrack.setAttribute("aria-hidden", "true");
+      toggleLabel.append(enabledToggle, toggleTrack);
+
+      const label = document.createElement("div");
+      label.className = "binding-label";
+      const title = document.createElement("strong");
+      title.textContent = bindingTargetLabel(binding.target);
+      const subtitle = document.createElement("span");
+      subtitle.className = "muted";
+      subtitle.textContent = `${scopeLabel(binding)} · ${targetModeFor(binding.target)}`;
+      label.append(title, subtitle);
+
+      const combo = document.createElement("span");
+      combo.className = "combo";
+      combo.textContent = binding.keyCombo || "unset";
+      const statusDot = document.createElement("span");
+      statusDot.className = "binding-status-dot";
+      statusDot.setAttribute("aria-hidden", "true");
       statusDot.classList.add(statusDotClass(binding));
       statusDot.title = statusText(binding);
-      const enabledToggle = item.querySelector(".binding-enabled");
-      const editButton = item.querySelector(".binding-edit");
-      const menuActions = item.querySelector(".binding-menu-actions");
+      bindingMain.append(toggleLabel, label, combo, statusDot);
+
+      const bindingActions = document.createElement("div");
+      bindingActions.className = "binding-actions";
+      const editButton = document.createElement("button");
+      editButton.className = "binding-edit";
+      editButton.type = "button";
+
+      const menu = document.createElement("details");
+      menu.className = "popup-menu more-menu binding-menu";
+      const summary = document.createElement("summary");
+      summary.title = "More actions";
+      summary.setAttribute("aria-label", "More binding actions");
+      summary.setAttribute("aria-haspopup", "menu");
+      summary.appendChild(iconNode("more"));
+      const menuActions = document.createElement("div");
+      menuActions.className = "menu-popover binding-menu-actions";
+      menu.append(summary, menuActions);
+      bindingActions.append(editButton, menu);
+      item.append(bindingMain, bindingActions);
+
       const editForm = document.createElement("div");
       editForm.className = "binding-edit-form";
       editForm.dataset.bindingId = binding.id;
