@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Import Firebinds Backup</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body class="import-page">
+    <main class="import-app">
+      <header class="import-header">
+        <div class="brand">
+          <img class="brand-icon" src="../icons/icon32.png" alt="" aria-hidden="true">
+          <div>
+            <h1>Import backup</h1>
+            <p class="muted">Restore Firebinds profiles, shortcuts, and settings.</p>
+          </div>
+        </div>
+      </header>
+
+      <section id="notice" class="notice" hidden></section>
+
+      <section class="panel import-panel">
+        <label class="field">
+          <span>Backup file</span>
+          <input id="importFileInput" class="import-file-picker" type="file" accept="application/json,.json">
+        </label>
+        <p id="fileSummary" class="target">No file selected.</p>
+        <div class="actions">
+          <button id="importButton" class="primary" type="button" disabled>Import backup</button>
+          <button id="closeButton" type="button">Close</button>
+        </div>
+      </section>
+
+      <details class="panel import-debug" hidden>
+        <summary>Import debug log</summary>
+        <pre id="debugOutput">No debug entries yet.</pre>
+        <div class="actions">
+          <button id="refreshDebugButton" type="button">Refresh log</button>
+          <button id="clearDebugButton" type="button">Clear log</button>
+        </div>
+      </details>
+    </main>
+
+    <script src="../src/api.js"></script>
+    <script src="../src/messages.js"></script>
+    <script src="import.js"></script>
+  </body>
+</html>

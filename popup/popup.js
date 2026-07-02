@@ -64,9 +64,58 @@
     Enable: "power",
     Delete: "trash"
   };
+  const IMPORT_DEBUG_KEY = "firebinds.importDebug";
 
   function send(message) {
     return browser.runtime.sendMessage(message);
+  }
+
+  function preventBrowserZoom(event) {
+    if (!event.ctrlKey && !event.metaKey) return;
+    if (event.type === "wheel") {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "+" || event.key === "-" || event.key === "=" || event.key === "0") {
+      event.preventDefault();
+    }
+  }
+
+  async function resetPageZoom() {
+    if (!browser.tabs || !browser.tabs.getCurrent || !browser.tabs.setZoom) return;
+    try {
+      const tab = await browser.tabs.getCurrent();
+      if (tab && tab.id !== undefined) await browser.tabs.setZoom(tab.id, 1);
+    } catch (_error) {
+      // Zoom reset is best-effort; the popup should still load if the browser denies it.
+    }
+  }
+
+  async function isFirefox() {
+    if (!browser.runtime.getBrowserInfo) return false;
+    try {
+      const info = await browser.runtime.getBrowserInfo();
+      return /firefox/i.test(info.name || "");
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async function appendImportDebug(stage, detail = {}) {
+    const entry = {
+      stage,
+      at: new Date().toISOString(),
+      page: "popup",
+      visibility: document.visibilityState,
+      detail
+    };
+    try {
+      const result = await browser.storage.local.get(IMPORT_DEBUG_KEY);
+      const entries = Array.isArray(result[IMPORT_DEBUG_KEY]) ? result[IMPORT_DEBUG_KEY] : [];
+      await browser.storage.local.set({ [IMPORT_DEBUG_KEY]: [...entries, entry].slice(-100) });
+    } catch (error) {
+      console.info("[Firebinds import debug]", entry, error);
+    }
   }
 
   function iconNode(name) {
@@ -374,8 +423,13 @@
     for (const binding of bindings) {
       const item = document.createElement("article");
       item.className = "binding";
+      item.classList.toggle("is-disabled", !binding.enabled);
       item.innerHTML = `
         <div class="binding-main">
+          <label class="binding-toggle" title="${binding.enabled ? "Disable shortcut" : "Enable shortcut"}">
+            <input class="binding-enabled" type="checkbox" aria-label="${binding.enabled ? "Disable shortcut" : "Enable shortcut"}">
+            <span aria-hidden="true"></span>
+          </label>
           <div class="binding-label">
             <strong></strong>
             <span class="muted"></span>
@@ -396,15 +450,17 @@
       item.querySelector("strong").textContent = bindingTargetLabel(binding.target);
       item.querySelector(".muted").textContent = `${scopeLabel(binding)} · ${targetModeFor(binding.target)} · ${statusText(binding)}`;
       item.querySelector(".combo").textContent = binding.keyCombo || "unset";
+      const enabledToggle = item.querySelector(".binding-enabled");
       const editButton = item.querySelector(".binding-edit");
       const menuActions = item.querySelector(".binding-menu-actions");
 
+      enabledToggle.checked = Boolean(binding.enabled);
+      enabledToggle.addEventListener("change", () => toggleBinding(binding));
       setButtonContent(editButton, "Edit", BUTTON_ICONS.Edit);
       editButton.addEventListener("click", () => editBinding(binding));
       menuActions.append(
         button("Test", () => testTarget(binding.target)),
         button("Duplicate", () => duplicateBinding(binding)),
-        button(binding.enabled ? "Disable" : "Enable", () => toggleBinding(binding)),
         button("Delete", () => deleteBinding(binding), { danger: true })
       );
       els.bindingsList.appendChild(item);
@@ -426,7 +482,9 @@
     pageState = state;
     if (!state.ok) {
       setForm(null);
-      els.pageLabel.textContent = state.reason || "Unsupported page";
+      const label = state.reason || "Unsupported page";
+      els.pageLabel.textContent = label;
+      els.pageLabel.title = label;
       els.controls.hidden = true;
       els.profilePanel.hidden = true;
       syncSettingsUi(state);
@@ -438,6 +496,7 @@
     els.controls.hidden = false;
     els.profilePanel.hidden = false;
     els.pageLabel.textContent = pageLabel(state.page.url);
+    els.pageLabel.title = state.page.url || els.pageLabel.textContent;
     syncSettingsUi(state);
     renderProfiles();
     renderBindings();
@@ -663,12 +722,24 @@
     showNotice("Backup exported.", "");
   }
 
-  async function importBackupFile(file) {
+  async function importBackupFile(file, sourcePage = "popup") {
+    await appendImportDebug("file-input-change", { hasFile: Boolean(file), sourcePage });
     if (!file) return;
     try {
-      const backup = JSON.parse(await file.text());
+      let backup;
+      try {
+        await appendImportDebug("file-read-start", { name: file.name, size: file.size, sourcePage });
+        backup = JSON.parse(await file.text());
+        await appendImportDebug("json-parse-ok", { sourcePage });
+      } catch (_error) {
+        showNotice("Backup file is not valid JSON.", "error");
+        return;
+      }
+      await appendImportDebug("confirm-start", { sourcePage });
       if (!confirm("Importing this backup will replace all current Firebinds profiles and shortcuts.")) return;
+      await appendImportDebug("message-send", { sourcePage });
       const result = await send({ type: M.IMPORT_BACKUP, backup });
+      await appendImportDebug("message-result", { ok: Boolean(result && result.ok), reason: result && result.reason, sourcePage });
       if (!result.ok) {
         showNotice(result.reason || "Could not import backup.", "error");
         return;
@@ -677,9 +748,27 @@
       await loadState();
       showNotice("Backup imported.", "");
     } catch (error) {
-      showNotice(error.message || "Backup file is not valid JSON.", "error");
+      showNotice(error.message || "Could not import backup.", "error");
     } finally {
       els.importFileInput.value = "";
+    }
+  }
+
+  async function openImportPage() {
+    try {
+      await send({ type: M.CLEAR_IMPORT_DEBUG });
+      await appendImportDebug("import-click");
+      const url = browser.runtime.getURL("popup/import.html");
+      if (await isFirefox()) {
+        await browser.windows.create({ url, type: "popup", width: 420, height: 560 });
+        window.close();
+      } else {
+        els.importFileInput.value = "";
+        els.importFileInput.focus();
+        els.importFileInput.click();
+      }
+    } catch (error) {
+      showNotice(error.message || "Could not open import page.", "error");
     }
   }
 
@@ -712,10 +801,10 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePopupMenus(null, true);
   });
+  document.addEventListener("wheel", preventBrowserZoom, { passive: false });
+  document.addEventListener("keydown", preventBrowserZoom);
   els.exportButton.addEventListener("click", exportBackup);
-  els.importButton.addEventListener("click", () => {
-    els.importFileInput.click();
-  });
+  els.importButton.addEventListener("click", openImportPage);
   els.importFileInput.addEventListener("change", () => importBackupFile(els.importFileInput.files[0]));
   els.addButton.addEventListener("click", newForm);
   els.pickTargetButton.addEventListener("click", () => startPicker(form && form.id));
@@ -778,6 +867,17 @@
   els.cancelButton.addEventListener("click", cancelForm);
   els.testTargetButton.addEventListener("click", () => testTarget());
 
+  window.addEventListener("pagehide", (event) => {
+    appendImportDebug("pagehide", { persisted: Boolean(event.persisted) });
+  });
+  window.addEventListener("beforeunload", () => {
+    appendImportDebug("beforeunload");
+  });
+  document.addEventListener("visibilitychange", () => {
+    appendImportDebug("visibilitychange");
+  });
+
+  resetPageZoom().catch((_error) => {});
   loadState().catch((error) => {
     showNotice(error.message || "Could not load Firebinds.", "error");
   });

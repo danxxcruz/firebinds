@@ -96,20 +96,6 @@
       <section id="notice" class="notice" hidden></section>
 
       <div id="mainView" class="view-stack">
-        <section id="profilePanel" class="profile-panel">
-          <label class="field compact">
-            <span>Profile</span>
-            <select id="profileSelect"></select>
-          </label>
-          <span id="profileCount" class="count">0</span>
-          <div class="profile-actions">
-            <button id="newProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-plus"></use></svg><span>New</span></button>
-            <button id="renameProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Rename</span></button>
-            <button id="duplicateProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-copy"></use></svg><span>Duplicate</span></button>
-            <button id="deleteProfileButton" class="danger icon-only" type="button" title="Delete profile" aria-label="Delete profile"><svg class="button-icon" aria-hidden="true"><use href="#icon-trash"></use></svg></button>
-          </div>
-        </section>
-
         <section id="controls" class="toolbar">
           <button id="addButton" class="primary full-width" type="button">
             <svg class="button-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
@@ -180,6 +166,25 @@
           </div>
           <div id="bindingsList" class="bindings"></div>
         </section>
+
+        <section id="profilePanel" class="profile-panel">
+          <label class="field compact">
+            <span>Profile</span>
+            <select id="profileSelect"></select>
+          </label>
+          <span id="profileCount" class="count">0</span>
+          <details class="popup-menu more-menu profile-menu">
+            <summary title="Profile actions" aria-label="Profile actions" aria-haspopup="menu">
+              <svg class="button-icon" aria-hidden="true"><use href="#icon-more"></use></svg>
+            </summary>
+            <div class="menu-popover profile-menu-actions">
+              <button id="newProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-plus"></use></svg><span>New</span></button>
+              <button id="renameProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-edit"></use></svg><span>Rename</span></button>
+              <button id="duplicateProfileButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-copy"></use></svg><span>Duplicate</span></button>
+              <button id="deleteProfileButton" class="danger" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>Delete profile</span></button>
+            </div>
+          </details>
+        </section>
       </div>
 
       <section id="settingsView" class="settings-view" hidden>
@@ -192,47 +197,64 @@
           </div>
         </div>
 
-        <section class="settings-section">
+        <div class="settings-group">
           <div class="settings-section-heading">
             <h3>Indicators</h3>
           </div>
-          <label class="setting-row">
-            <span>
-              <strong>Show indicators</strong>
-            </span>
-            <input id="indicatorsToggle" type="checkbox">
-          </label>
-          <label class="setting-row opacity-row">
-            <strong>Opacity</strong>
-            <div class="range-control">
-              <input id="indicatorOpacityRange" type="range" min="0.35" max="1" step="0.05" value="1">
-              <output id="indicatorOpacityValue">100%</output>
-            </div>
-          </label>
-        </section>
+          <section class="settings-section">
+            <label class="setting-row">
+              <span>
+                <strong>Show indicators</strong>
+                <p class="hint">Small key labels over bound elements on the page.</p>
+              </span>
+              <input id="indicatorsToggle" type="checkbox">
+            </label>
+            <label class="setting-row opacity-row">
+              <span>
+                <strong>Opacity</strong>
+                <p class="hint">How visible indicators are against page content.</p>
+              </span>
+              <div class="range-control">
+                <input id="indicatorOpacityRange" type="range" min="0.35" max="1" step="0.05" value="1">
+                <output id="indicatorOpacityValue">100%</output>
+              </div>
+            </label>
+          </section>
+        </div>
 
-        <section class="settings-section">
+        <div class="settings-group">
           <div class="settings-section-heading">
             <h3>Data</h3>
           </div>
-          <div class="settings-actions">
-            <button id="exportButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-upload"></use></svg><span>Export backup</span></button>
-            <button id="importButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-download"></use></svg><span>Import backup</span></button>
-            <input id="importFileInput" type="file" accept="application/json,.json" hidden>
-          </div>
-        </section>
+          <section class="settings-section">
+            <div class="setting-row vertical">
+              <span>
+                <strong>Backup</strong>
+                <p class="hint">Export bindings and profiles to move them to another browser.</p>
+              </span>
+            </div>
+            <div class="settings-actions">
+              <button id="exportButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-upload"></use></svg><span>Export backup</span></button>
+              <button id="importButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-download"></use></svg><span>Import backup</span></button>
+              <input id="importFileInput" class="file-input" type="file" accept="application/json,.json" aria-label="Import backup file">
+            </div>
+          </section>
+        </div>
 
-        <section class="settings-section">
+        <div class="settings-group">
           <div class="settings-section-heading">
             <h3>Diagnostics</h3>
           </div>
-          <label class="setting-row">
-            <span>
-              <strong>Debug keys</strong>
-            </span>
-            <input id="debugKeysToggle" type="checkbox">
-          </label>
-        </section>
+          <section class="settings-section">
+            <label class="setting-row">
+              <span>
+                <strong>Debug keys</strong>
+                <p class="hint">Logs every captured keypress to the console.</p>
+              </span>
+              <input id="debugKeysToggle" type="checkbox">
+            </label>
+          </section>
+        </div>
       </section>
     </main>
 
