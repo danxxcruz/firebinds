@@ -130,6 +130,7 @@
       els.importFileInput.value = "";
       els.fileSummary.textContent = fileLabel(null);
       showNotice("Backup imported.", "");
+      window.setTimeout(() => window.close(), 350);
     } catch (error) {
       await appendImportDebug("message-result", { ok: false, reason: error.message || "Extension error." });
       showNotice(error.message || "Could not import backup.", "error");

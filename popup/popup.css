@@ -384,19 +384,19 @@ button:active,
   align-self: end;
 }
 
-.binding-actions button {
+.binding-actions > button {
   gap: 4px;
   min-height: 30px;
   padding: 4px 8px;
   font-size: 12px;
 }
 
-.binding-actions .button-icon {
+.binding-actions > button .button-icon {
   width: 12px;
   height: 12px;
 }
 
-.binding-actions .icon-only {
+.binding-actions > .icon-only {
   width: 30px;
   min-width: 30px;
   padding: 0;
@@ -448,6 +448,8 @@ button:active,
 
 .menu-popover {
   position: absolute;
+  top: 100%;
+  bottom: auto;
   right: 0;
   z-index: 5;
   display: grid;
@@ -459,6 +461,13 @@ button:active,
   border-radius: 8px;
   background: var(--surface-solid);
   box-shadow: var(--shadow);
+}
+
+.popup-menu.menu-flip .menu-popover {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 6px;
 }
 
 .menu-popover button {
@@ -641,6 +650,13 @@ button:active,
   box-shadow: var(--control-shadow);
 }
 
+.binding.is-editing {
+  padding-left: 9px;
+  border-left: 3px solid var(--accent);
+  background: rgba(0, 122, 255, 0.08);
+  box-shadow: var(--control-shadow);
+}
+
 .binding-main {
   display: flex;
   align-items: center;
@@ -672,6 +688,22 @@ button:active,
   line-height: 1.35;
   box-shadow: var(--control-shadow);
   white-space: nowrap;
+}
+
+.binding-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface-solid);
+}
+
+.binding-status-dot.is-ready {
+  background: #30d158;
+}
+
+.binding-status-dot.is-attention {
+  background: #ffb020;
 }
 
 .binding-toggle {
@@ -756,14 +788,25 @@ button:active,
   display: none;
 }
 
-.binding-menu-actions {
-  min-width: 144px;
+.binding-edit-form {
+  display: grid;
+  gap: 10px;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 11px;
+  border: 0 solid transparent;
+  border-radius: 10px;
+  background: var(--surface-solid);
+  opacity: 0;
+  transition: max-height 180ms ease, opacity 140ms ease, padding 180ms ease;
 }
 
-.binding-menu-actions button {
-  min-height: 30px;
-  padding: 4px 8px;
-  font-size: 12px;
+.binding-edit-form.is-open {
+  max-height: 460px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  opacity: 1;
 }
 
 .empty {
@@ -846,7 +889,7 @@ button:active,
   align-items: stretch;
 }
 
-.setting-row input[type="checkbox"] {
+.setting-row > input[type="checkbox"] {
   flex: 0 0 auto;
   accent-color: var(--accent);
 }
@@ -1013,7 +1056,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 
 @media (prefers-reduced-motion: reduce) {
   .view-transition,
-  .header-transition {
+  .header-transition,
+  .binding-edit-form {
     transition: none;
   }
 }

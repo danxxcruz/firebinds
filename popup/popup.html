@@ -116,7 +116,7 @@
           </label>
 
           <div id="pickerTargetPanel" class="target-panel">
-            <p id="targetLabel" class="target">No element selected.</p>
+            <p id="targetLabel" class="target">Choose an element to bind to.</p>
             <button id="pickTargetButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Pick element</span></button>
           </div>
 
@@ -153,8 +153,8 @@
           </div>
 
           <div class="actions">
-            <button id="saveButton" class="primary" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-check"></use></svg><span>Save</span></button>
             <button id="testTargetButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-target"></use></svg><span>Test target</span></button>
+            <button id="saveButton" class="primary" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-check"></use></svg><span>Save</span></button>
             <button id="cancelButton" type="button"><svg class="button-icon" aria-hidden="true"><use href="#icon-x"></use></svg><span>Cancel</span></button>
           </div>
         </section>
@@ -202,13 +202,16 @@
             <h3>Indicators</h3>
           </div>
           <section class="settings-section">
-            <label class="setting-row">
+            <div class="setting-row">
               <span>
                 <strong>Show indicators</strong>
                 <p class="hint">Small key labels over bound elements on the page.</p>
               </span>
-              <input id="indicatorsToggle" type="checkbox">
-            </label>
+              <label class="binding-toggle" title="Show indicators">
+                <input id="indicatorsToggle" type="checkbox" aria-label="Show indicators">
+                <span aria-hidden="true"></span>
+              </label>
+            </div>
             <label class="setting-row opacity-row">
               <span>
                 <strong>Opacity</strong>
@@ -246,13 +249,16 @@
             <h3>Diagnostics</h3>
           </div>
           <section class="settings-section">
-            <label class="setting-row">
+            <div class="setting-row">
               <span>
                 <strong>Debug keys</strong>
                 <p class="hint">Logs every captured keypress to the console.</p>
               </span>
-              <input id="debugKeysToggle" type="checkbox">
-            </label>
+              <label class="binding-toggle" title="Debug keys">
+                <input id="debugKeysToggle" type="checkbox" aria-label="Debug keys">
+                <span aria-hidden="true"></span>
+              </label>
+            </div>
           </section>
         </div>
       </section>
